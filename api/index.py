@@ -83,6 +83,13 @@ async def webhook_handler(
         for repo in event.get("repositories", []):
             owner, repo_name = repo["full_name"].split("/")
             await _handle_onboarding(installation_id, owner, repo_name)
+            
+    # --- Repositories added to existing installation → onboarding PR ---
+    elif "installation" in event and action == "added":
+        installation_id = event["installation"]["id"]
+        for repo in event.get("repositories_added", []):
+            owner, repo_name = repo["full_name"].split("/")
+            await _handle_onboarding(installation_id, owner, repo_name)
 
     # --- PR opened → trigger the worker ---
     elif "pull_request" in event and action == "opened":
