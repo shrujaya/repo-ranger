@@ -6,8 +6,8 @@ from fastapi import FastAPI, Request, HTTPException, Header
 from fastapi.responses import HTMLResponse
 from typing import Optional
 
-# Vercel runs files in api/ at the repo root, so we do a direct import
-from github_api import GitHubAppAuth, trigger_workflow_dispatch, create_file_and_pr
+# Vercel runs files in api/ at the repo root, so we do a package-relative import
+from .github_api import GitHubAppAuth, trigger_workflow_dispatch, create_file_and_pr
 
 app = FastAPI(title="RepoRanger Dispatcher")
 
