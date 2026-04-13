@@ -1,0 +1,5 @@
+fastapi
+httpx
+PyJWT
+cryptography
+python-multipart

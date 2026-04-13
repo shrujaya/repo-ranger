@@ -1,0 +1,224 @@
+import os
+import hmac
+import hashlib
+import httpx
+from fastapi import FastAPI, Request, HTTPException, Header
+from fastapi.responses import HTMLResponse
+from typing import Optional
+
+# Vercel runs files in api/ at the repo root, so we do a direct import
+from github_api import GitHubAppAuth, trigger_workflow_dispatch, create_file_and_pr
+
+app = FastAPI(title="RepoRanger Dispatcher")
+
+# ---------------------------------------------------------------------------
+# Config (populated from Vercel Environment Variables)
+# ---------------------------------------------------------------------------
+APP_ID = os.getenv("APP_ID", "")
+PRIVATE_KEY = os.getenv("GITHUB_APP_PRIVATE_KEY", "").replace("\\n", "\n")
+WEBHOOK_SECRET = os.getenv("WEBHOOK_SECRET", "")
+DELETE_SECRET = os.getenv("DELETE_SECRET", "ranger-danger")
+
+# Template path is relative to repo root (Vercel makes repo root the cwd)
+_TEMPLATE_PATH = os.path.join(os.path.dirname(__file__), "..", "templates", "ai-bot.yml")
+
+auth = GitHubAppAuth(APP_ID, PRIVATE_KEY) if APP_ID and PRIVATE_KEY else None
+
+# ---------------------------------------------------------------------------
+# Helpers
+# ---------------------------------------------------------------------------
+
+def _verify_signature(payload_body: bytes, signature_header: Optional[str]) -> bool:
+    """Verify the X-Hub-Signature-256 header from GitHub."""
+    if not WEBHOOK_SECRET:
+        return True
+    if not signature_header:
+        return False
+    mac = hmac.new(WEBHOOK_SECRET.encode(), msg=payload_body, digestmod=hashlib.sha256)
+    expected = "sha256=" + mac.hexdigest()
+    return hmac.compare_digest(expected, signature_header)
+
+
+def _make_delete_token(owner: str, repo: str, branch: str) -> str:
+    return hmac.new(
+        DELETE_SECRET.encode(), f"{owner}/{repo}/{branch}".encode(), hashlib.sha256
+    ).hexdigest()
+
+
+def _load_template() -> str:
+    try:
+        with open(_TEMPLATE_PATH) as f:
+            return f.read()
+    except FileNotFoundError:
+        return "name: RepoRanger\non: [workflow_dispatch]\n"
+
+
+# ---------------------------------------------------------------------------
+# Routes
+# ---------------------------------------------------------------------------
+
+@app.get("/")
+async def health():
+    return {"status": "RepoRanger is on duty 🌳"}
+
+
+@app.post("/webhook")
+async def webhook_handler(
+    request: Request,
+    x_hub_signature_256: Optional[str] = Header(None),
+):
+    payload_body = await request.body()
+    if not _verify_signature(payload_body, x_hub_signature_256):
+        raise HTTPException(status_code=401, detail="Invalid signature")
+
+    if not auth:
+        raise HTTPException(status_code=500, detail="GitHub App not configured")
+
+    event = await request.json()
+    action = event.get("action")
+
+    # --- App installation → onboarding PR ---
+    if "installation" in event and action == "created":
+        installation_id = event["installation"]["id"]
+        for repo in event.get("repositories", []):
+            owner, repo_name = repo["full_name"].split("/")
+            await _handle_onboarding(installation_id, owner, repo_name)
+
+    # --- PR opened → trigger the worker ---
+    elif "pull_request" in event and action == "opened":
+        installation_id = event["installation"]["id"]
+        owner = event["repository"]["owner"]["login"]
+        repo_name = event["repository"]["name"]
+        pr_number = event["pull_request"]["number"]
+        token = await auth.get_installation_token(installation_id)
+        await trigger_workflow_dispatch(
+            token, owner, repo_name, "ai-bot.yml", "main",
+            inputs={"task": "review", "pr_number": str(pr_number)},
+        )
+
+    return {"status": "accepted"}
+
+
+async def _handle_onboarding(installation_id: int, owner: str, repo: str):
+    """Idempotent: open the Welcome PR only if neither the file nor the PR exist."""
+    token = await auth.get_installation_token(installation_id)
+
+    # Guard 1 – workflow file already committed
+    if await auth.get_file_sha(token, owner, repo, ".github/workflows/ai-bot.yml"):
+        print(f"[onboarding] ai-bot.yml already exists in {owner}/{repo}, skipping.")
+        return
+
+    # Guard 2 – setup PR already open
+    open_prs = await auth.list_pull_requests(token, owner, repo)
+    if any(pr["title"] == "🤖 Setup: Initialize RepoRanger" for pr in open_prs):
+        print(f"[onboarding] Setup PR already open for {owner}/{repo}, skipping.")
+        return
+
+    await create_file_and_pr(
+        token, owner, repo,
+        branch="setup/reporanger-init",
+        path=".github/workflows/ai-bot.yml",
+        content=_load_template(),
+        commit_message="🤖 chore: add RepoRanger workflow",
+        pr_title="🤖 Setup: Initialize RepoRanger",
+        pr_body=(
+            "👋 **Welcome to RepoRanger!**\n\n"
+            "I've added `.github/workflows/ai-bot.yml` to this branch. "
+            "Merge this PR to activate AI-powered PR reviews and branch hygiene.\n\n"
+            "> **Action Required:** Add `GROQ_API_KEY` to this repository's "
+            "[Secrets](../../settings/secrets/actions) before merging."
+        ),
+    )
+
+
+@app.get("/delete", response_class=HTMLResponse)
+async def delete_confirmation(token: str, branch: str, owner: str, repo: str):
+    """Serve the human-readable confirmation page for branch deletion."""
+    if not hmac.compare_digest(token, _make_delete_token(owner, repo, branch)):
+        raise HTTPException(status_code=401, detail="Invalid token")
+
+    return f"""<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>RepoRanger – Delete branch</title>
+  <style>
+    body {{ font-family: system-ui, sans-serif; background: #f0f4f0;
+           display: grid; place-items: center; min-height: 100vh; margin: 0; }}
+    .card {{ background: #fff; padding: 2rem 2.5rem; border-radius: 14px;
+             border: 2px solid #2d5a27; max-width: 420px; text-align: center; }}
+    h2 {{ color: #2d5a27; margin-top: 0; }}
+    code {{ background: #f5f5f5; padding: 2px 6px; border-radius: 4px; }}
+    .btn-danger {{ background: #e74c3c; color: #fff; border: none;
+                  padding: 10px 22px; border-radius: 6px; cursor: pointer;
+                  font-size: 1rem; }}
+    .btn-cancel {{ margin-left: 12px; color: #7f8c8d; text-decoration: none; }}
+  </style>
+</head>
+<body>
+  <div class="card">
+    <h2>🌳 RepoRanger Janitor</h2>
+    <p>Delete branch <code>{branch}</code> from <strong>{owner}/{repo}</strong>?</p>
+    <form action="/delete/execute" method="post">
+      <input type="hidden" name="token" value="{token}">
+      <input type="hidden" name="branch" value="{branch}">
+      <input type="hidden" name="owner" value="{owner}">
+      <input type="hidden" name="repo" value="{repo}">
+      <button class="btn-danger" type="submit">Yes, delete it</button>
+      <a class="btn-cancel" href="javascript:history.back()">Cancel</a>
+    </form>
+  </div>
+</body>
+</html>"""
+
+
+@app.post("/delete/execute", response_class=HTMLResponse)
+async def execute_delete(request: Request):
+    """Verify the signed token and delete the branch via GitHub API."""
+    form = await request.form()
+    token = form.get("token", "")
+    branch = form.get("branch", "")
+    owner = form.get("owner", "")
+    repo = form.get("repo", "")
+
+    if not hmac.compare_digest(token, _make_delete_token(owner, repo, branch)):
+        raise HTTPException(status_code=401, detail="Invalid token")
+
+    if not auth:
+        raise HTTPException(status_code=500, detail="GitHub App not configured")
+
+    # Look up the installation for this repo
+    jwt_token = auth.generate_jwt()
+    async with httpx.AsyncClient() as client:
+        resp = await client.get(
+            f"https://api.github.com/repos/{owner}/{repo}/installation",
+            headers={"Authorization": f"Bearer {jwt_token}", "Accept": "application/vnd.github+json"},
+        )
+    if resp.status_code != 200:
+        raise HTTPException(status_code=404, detail="Installation not found for this repo")
+
+    install_token = await auth.get_installation_token(resp.json()["id"])
+    await auth.delete_branch(install_token, owner, repo, branch)
+
+    return f"""<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>RepoRanger – Branch deleted</title>
+  <style>
+    body {{ font-family: system-ui, sans-serif; background: #f0f4f0;
+           display: grid; place-items: center; min-height: 100vh; margin: 0; }}
+    .card {{ background: #fff; padding: 2rem 2.5rem; border-radius: 14px;
+             border: 2px solid #2d5a27; max-width: 420px; text-align: center; }}
+    h2 {{ color: #2d5a27; margin-top: 0; }}
+    code {{ background: #f5f5f5; padding: 2px 6px; border-radius: 4px; }}
+  </style>
+</head>
+<body>
+  <div class="card">
+    <h2>✅ Branch Deleted</h2>
+    <p><code>{branch}</code> has been removed from <strong>{owner}/{repo}</strong>.</p>
+    <p>The forest is a little cleaner now. 🌿</p>
+  </div>
+</body>
+</html>"""

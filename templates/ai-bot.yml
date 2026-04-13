@@ -1,0 +1,32 @@
+name: RepoRanger
+on:
+  pull_request:
+    types: [opened]
+  workflow_dispatch:
+    inputs:
+      task:
+        description: 'Task to run (review/janitor)'
+        default: 'review'
+      pr_number:
+        description: 'PR number to review'
+        required: false
+
+jobs:
+  reporanger:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Monorepo
+        uses: actions/checkout@v3
+        with:
+          repository: 'shrujaya/repo-ranger' # Points back to the central RepoRanger repo
+          ref: 'main'
+          path: './reporanger'
+
+      - name: Run RepoRanger Worker
+        uses: ./reporanger/worker
+        with:
+          task: ${{ github.event.inputs.task || (github.event_name == 'pull_request' && 'review' || 'janitor') }}
+          pr_number: ${{ github.event.pull_request.number || github.event.inputs.pr_number }}
+        env:
+          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+          DISPATCHER_URL: 'https://repo-ranger-dispatcher.vercel.app' # Replace with actual Vercel URL

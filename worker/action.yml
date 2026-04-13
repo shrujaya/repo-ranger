@@ -1,0 +1,33 @@
+name: 'RepoRanger Worker'
+description: 'AI-Powered PR Reviewer and Branch Janitor'
+inputs:
+  task:
+    description: 'The task to run (review or janitor)'
+    required: true
+    default: 'review'
+  pr_number:
+    description: 'The PR number to review'
+    required: false
+  dead_branch_threshold:
+    description: 'Days before a branch is considered stale'
+    required: false
+    default: '10'
+runs:
+  using: 'composite'
+  steps:
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.10'
+    - name: Install dependencies
+      run: pip install -r worker/requirements.txt
+      shell: bash
+    - name: Run RepoRanger
+      run: python -m worker.main
+      shell: bash
+      env:
+        GITHUB_TOKEN: ${{ github.token }}
+        GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+        INPUT_TASK: ${{ inputs.task }}
+        INPUT_PR_NUMBER: ${{ inputs.pr_number }}
+        INPUT_DEAD_BRANCH_THRESHOLD: ${{ inputs.dead_branch_threshold }}
