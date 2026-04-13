@@ -26,13 +26,13 @@ graph TD
 
 ## 📦 Setup Instructions
 
-### 1. Host the Dispatcher
-Deploy the `/apps/dispatcher` folder to Vercel. 
-Environment Variables needed:
+### 1. Deploy the API to Vercel
+Deploy the entire repository to Vercel. Vercel will automatically detect the Python app because of the `vercel.json` config mapping routes to `/api/index.py`.
+You must set the following **Environment Variables** in your Vercel project settings:
 - `APP_ID`: Your GitHub App ID.
-- `GITHUB_APP_PRIVATE_KEY`: Your GitHub App private key.
+- `GITHUB_APP_PRIVATE_KEY`: Your GitHub App private key (paste the entire contents of the `.pem` file).
 - `WEBHOOK_SECRET`: Your GitHub App webhook secret.
-- `DELETE_SECRET`: A shared secret for branch deletion links.
+- `DELETE_SECRET`: A custom string for branch deletion link signatures (e.g., `my-super-secret`).
 
 ### 2. Configure GitHub App
 - **Permissions**: Pull Requests (R/W), Contents (R/W), Actions (R/W), Issues (R/W).
