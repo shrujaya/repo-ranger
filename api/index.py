@@ -67,43 +67,51 @@ async def webhook_handler(
     request: Request,
     x_hub_signature_256: Optional[str] = Header(None),
 ):
-    payload_body = await request.body()
-    if not _verify_signature(payload_body, x_hub_signature_256):
-        raise HTTPException(status_code=401, detail="Invalid signature")
+    try:
+        payload_body = await request.body()
+        if not _verify_signature(payload_body, x_hub_signature_256):
+            raise HTTPException(status_code=401, detail="Invalid signature")
 
-    if not auth:
-        raise HTTPException(status_code=500, detail="GitHub App not configured")
+        if not auth:
+            raise HTTPException(status_code=500, detail="GitHub App not configured")
 
-    event = await request.json()
-    action = event.get("action")
+        event = await request.json()
+        action = event.get("action")
 
-    # --- App installation → onboarding PR ---
-    if "installation" in event and action == "created":
-        installation_id = event["installation"]["id"]
-        for repo in event.get("repositories", []):
-            owner, repo_name = repo["full_name"].split("/")
-            await _handle_onboarding(installation_id, owner, repo_name)
-            
-    # --- Repositories added to existing installation → onboarding PR ---
-    elif "installation" in event and action == "added":
-        installation_id = event["installation"]["id"]
-        for repo in event.get("repositories_added", []):
-            owner, repo_name = repo["full_name"].split("/")
-            await _handle_onboarding(installation_id, owner, repo_name)
+        # --- App installation → onboarding PR ---
+        if "installation" in event and action == "created":
+            installation_id = event["installation"]["id"]
+            for repo in event.get("repositories", []):
+                owner, repo_name = repo["full_name"].split("/")
+                await _handle_onboarding(installation_id, owner, repo_name)
+                
+        # --- Repositories added to existing installation → onboarding PR ---
+        elif "installation" in event and action == "added":
+            installation_id = event["installation"]["id"]
+            for repo in event.get("repositories_added", []):
+                owner, repo_name = repo["full_name"].split("/")
+                await _handle_onboarding(installation_id, owner, repo_name)
 
-    # --- PR opened → trigger the worker ---
-    elif "pull_request" in event and action == "opened":
-        installation_id = event["installation"]["id"]
-        owner = event["repository"]["owner"]["login"]
-        repo_name = event["repository"]["name"]
-        pr_number = event["pull_request"]["number"]
-        token = await auth.get_installation_token(installation_id)
-        await trigger_workflow_dispatch(
-            token, owner, repo_name, "ai-bot.yml", "main",
-            inputs={"task": "review", "pr_number": str(pr_number)},
-        )
+        # --- PR opened → trigger the worker ---
+        elif "pull_request" in event and action == "opened":
+            installation_id = event["installation"]["id"]
+            owner = event["repository"]["owner"]["login"]
+            repo_name = event["repository"]["name"]
+            pr_number = event["pull_request"]["number"]
+            token = await auth.get_installation_token(installation_id)
+            await trigger_workflow_dispatch(
+                token, owner, repo_name, "ai-bot.yml", "main",
+                inputs={"task": "review", "pr_number": str(pr_number)},
+            )
 
-    return {"status": "accepted"}
+        return {"status": "accepted"}
+    except Exception as e:
+        import traceback
+        from fastapi.responses import JSONResponse
+        return JSONResponse(status_code=500, content={
+            "error": str(e),
+            "traceback": traceback.format_exc()
+        })
 
 
 async def _handle_onboarding(installation_id: int, owner: str, repo: str):
