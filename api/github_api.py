@@ -136,14 +136,16 @@ async def create_file_and_pr(
         sha = base_resp.json()["object"]["sha"]
 
         # 2. Create the setup branch
-        await client.post(
+        branch_resp = await client.post(
             f"https://api.github.com/repos/{owner}/{repo}/git/refs",
             headers=gh_headers,
             json={"ref": f"refs/heads/{branch}", "sha": sha},
         )
+        if branch_resp.status_code >= 400:
+            raise Exception(f"Branch creation failed: {branch_resp.text}")
 
         # 3. Commit the file (base64-encoded)
-        await client.put(
+        commit_resp = await client.put(
             f"https://api.github.com/repos/{owner}/{repo}/contents/{path}",
             headers=gh_headers,
             json={
@@ -152,6 +154,8 @@ async def create_file_and_pr(
                 "branch": branch,
             },
         )
+        if commit_resp.status_code >= 400:
+            raise Exception(f"File commit failed: {commit_resp.text}")
 
         # 4. Open the PR
         pr_resp = await client.post(
@@ -159,5 +163,7 @@ async def create_file_and_pr(
             headers=gh_headers,
             json={"title": pr_title, "body": pr_body, "head": branch, "base": base_branch},
         )
-        pr_resp.raise_for_status()
+        if pr_resp.status_code >= 400:
+            raise Exception(f"PR creation failed: {pr_resp.text}")
+            
         return pr_resp.json()
