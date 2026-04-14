@@ -78,19 +78,23 @@ async def webhook_handler(
         event = await request.json()
         action = event.get("action")
 
+        messages = []
+        
         # --- App installation → onboarding PR ---
         if "installation" in event and action == "created":
             installation_id = event["installation"]["id"]
             for repo in event.get("repositories", []):
                 owner, repo_name = repo["full_name"].split("/")
-                await _handle_onboarding(installation_id, owner, repo_name)
+                msg = await _handle_onboarding(installation_id, owner, repo_name)
+                messages.append(msg)
                 
         # --- Repositories added to existing installation → onboarding PR ---
         elif "installation" in event and action == "added":
             installation_id = event["installation"]["id"]
             for repo in event.get("repositories_added", []):
                 owner, repo_name = repo["full_name"].split("/")
-                await _handle_onboarding(installation_id, owner, repo_name)
+                msg = await _handle_onboarding(installation_id, owner, repo_name)
+                messages.append(msg)
 
         # --- PR opened → trigger the worker ---
         elif "pull_request" in event and action == "opened":
@@ -103,8 +107,9 @@ async def webhook_handler(
                 token, owner, repo_name, "ai-bot.yml", "main",
                 inputs={"task": "review", "pr_number": str(pr_number)},
             )
+            messages.append(f"Triggered AI review worker for PR #{pr_number}")
 
-        return {"status": "accepted"}
+        return {"status": "accepted", "details": messages}
     except Exception as e:
         import traceback
         from fastapi.responses import JSONResponse
@@ -114,20 +119,18 @@ async def webhook_handler(
         })
 
 
-async def _handle_onboarding(installation_id: int, owner: str, repo: str):
+async def _handle_onboarding(installation_id: int, owner: str, repo: str) -> str:
     """Idempotent: open the Welcome PR only if neither the file nor the PR exist."""
     token = await auth.get_installation_token(installation_id)
 
     # Guard 1 – workflow file already committed
     if await auth.get_file_sha(token, owner, repo, ".github/workflows/ai-bot.yml"):
-        print(f"[onboarding] ai-bot.yml already exists in {owner}/{repo}, skipping.")
-        return
+        return f"[onboarding] ai-bot.yml already exists in {owner}/{repo}, skipping."
 
     # Guard 2 – setup PR already open
     open_prs = await auth.list_pull_requests(token, owner, repo)
     if any(pr["title"] == "🤖 Setup: Initialize RepoRanger" for pr in open_prs):
-        print(f"[onboarding] Setup PR already open for {owner}/{repo}, skipping.")
-        return
+        return f"[onboarding] Setup PR already open for {owner}/{repo}, skipping."
 
     await create_file_and_pr(
         token, owner, repo,
@@ -144,6 +147,7 @@ async def _handle_onboarding(installation_id: int, owner: str, repo: str):
             "[Secrets](../../settings/secrets/actions) before merging."
         ),
     )
+    return f"Successfully initiated '🤖 Setup: Initialize RepoRanger' on {owner}/{repo}"
 
 
 @app.get("/delete", response_class=HTMLResponse)
