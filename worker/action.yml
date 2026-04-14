@@ -20,11 +20,13 @@ runs:
       with:
         python-version: '3.10'
     - name: Install dependencies
-      run: pip install -r worker/requirements.txt
+      run: pip install -r requirements.txt
       shell: bash
+      working-directory: ${{ github.action_path }}
     - name: Run RepoRanger
       run: python -m worker.main
       shell: bash
+      working-directory: ${{ github.action_path }}/..
       env:
         GITHUB_TOKEN: ${{ github.token }}
         GROQ_API_KEY: ${{ env.GROQ_API_KEY }}
