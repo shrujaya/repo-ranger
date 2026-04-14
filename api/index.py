@@ -103,11 +103,25 @@ async def webhook_handler(
             owner = event["repository"]["owner"]["login"]
             repo_name = event["repository"]["name"]
             pr_number = event["pull_request"]["number"]
-            pr_body = event["pull_request"].get("body") or ""
-            pr_title = event["pull_request"].get("title") or ""
             token = await auth.get_installation_token(installation_id)
             
-            text_to_search = pr_title + "\n" + pr_body
+            await trigger_workflow_dispatch(
+                token, owner, repo_name, "ai-bot.yml", "main",
+                inputs={"task": "review", "target_number": str(pr_number)},
+            )
+            messages.append(f"Triggered AI review worker for PR #{pr_number}")
+
+        # --- Issue opened → keyword parser ---
+        elif "issue" in event and action == "opened" and "pull_request" not in event.get("issue", {}):
+            installation_id = event["installation"]["id"]
+            owner = event["repository"]["owner"]["login"]
+            repo_name = event["repository"]["name"]
+            issue_number = event["issue"]["number"]
+            issue_body = event["issue"].get("body") or ""
+            issue_title = event["issue"].get("title") or ""
+            token = await auth.get_installation_token(installation_id)
+            
+            text_to_search = issue_title + "\n" + issue_body
             match_manual = re.search(r'dead\+branches=(\d+)', text_to_search, re.IGNORECASE)
             match_cron = re.search(r'check\+dead=(\d+)', text_to_search, re.IGNORECASE)
             
@@ -115,44 +129,37 @@ async def webhook_handler(
                 days = match_manual.group(1)
                 await trigger_workflow_dispatch(
                     token, owner, repo_name, "ai-bot.yml", "main",
-                    inputs={"task": "janitor", "pr_number": str(pr_number), "dead_branch_threshold": days},
+                    inputs={"task": "janitor", "target_number": str(issue_number), "dead_branch_threshold": days},
                 )
-                messages.append(f"Triggered manual dead-branch check for {days} days on PR #{pr_number}")
+                messages.append(f"Triggered manual dead-branch check for {days} days on Issue #{issue_number}")
             elif match_cron:
                 days = match_cron.group(1)
-                await auth.create_issue_comment(token, owner, repo_name, pr_number, f"✅ Understood! I will check this repository for dead branches older than {days} days on a recurring schedule and report back here.")
-                messages.append(f"Acknowledged scheduled dead-branch check for {days} days on PR #{pr_number}")
-            else:
-                await trigger_workflow_dispatch(
-                    token, owner, repo_name, "ai-bot.yml", "main",
-                    inputs={"task": "review", "pr_number": str(pr_number)},
-                )
-                messages.append(f"Triggered AI review worker for PR #{pr_number}")
+                await auth.create_issue_comment(token, owner, repo_name, issue_number, f"✅ Understood! I will check this repository for dead branches older than {days} days on a recurring schedule and report back here.")
+                messages.append(f"Acknowledged scheduled dead-branch check for {days} days on Issue #{issue_number}")
 
         # --- Issue Comment created → Branch Deletion ---
         elif "issue_comment" in event and action == "created":
-            if "pull_request" in event.get("issue", {}):
-                comment_body = event["comment"]["body"].strip()
-                author_association = event["comment"]["author_association"]
-                # Only allow branch deletion if the commenter is an Admin, Member, or Collaborator
-                if author_association in ["OWNER", "MEMBER", "COLLABORATOR"]:
-                    installation_id = event["installation"]["id"]
-                    owner = event["repository"]["owner"]["login"]
-                    repo_name = event["repository"]["name"]
-                    issue_number = event["issue"]["number"]
-                    
-                    token = await auth.get_installation_token(installation_id)
-                    branches = await auth.list_branches(token, owner, repo_name)
-                    branch_names = [b["name"] for b in branches]
-                    
-                    if comment_body in branch_names:
-                        try:
-                            await auth.delete_branch(token, owner, repo_name, comment_body)
-                            await auth.create_issue_comment(token, owner, repo_name, issue_number, f"✅ Success! Branch `{comment_body}` has been permanently removed.")
-                            messages.append(f"Admin deleted branch: {comment_body}")
-                        except Exception as e:
-                            await auth.create_issue_comment(token, owner, repo_name, issue_number, f"⚠️ Failed to delete branch `{comment_body}`. Check permissions.\n`{str(e)}`")
-                            messages.append(f"Failed to delete branch: {comment_body}")
+            comment_body = event["comment"]["body"].strip()
+            author_association = event["comment"]["author_association"]
+            # Only allow branch deletion if the commenter is an Admin, Member, or Collaborator
+            if author_association in ["OWNER", "MEMBER", "COLLABORATOR"]:
+                installation_id = event["installation"]["id"]
+                owner = event["repository"]["owner"]["login"]
+                repo_name = event["repository"]["name"]
+                issue_number = event["issue"]["number"]
+                
+                token = await auth.get_installation_token(installation_id)
+                branches = await auth.list_branches(token, owner, repo_name)
+                branch_names = [b["name"] for b in branches]
+                
+                if comment_body in branch_names:
+                    try:
+                        await auth.delete_branch(token, owner, repo_name, comment_body)
+                        await auth.create_issue_comment(token, owner, repo_name, issue_number, f"✅ Success! Branch `{comment_body}` has been permanently removed.")
+                        messages.append(f"Admin deleted branch: {comment_body}")
+                    except Exception as e:
+                        await auth.create_issue_comment(token, owner, repo_name, issue_number, f"⚠️ Failed to delete branch `{comment_body}`. Check permissions.\n`{str(e)}`")
+                        messages.append(f"Failed to delete branch: {comment_body}")
 
         return {"status": "accepted", "details": messages}
     except Exception as e:

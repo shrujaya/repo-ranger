@@ -24,9 +24,9 @@ async def main():
         
     elif task == "janitor":
         threshold = int(os.getenv("INPUT_DEAD_BRANCH_THRESHOLD", "10"))
-        pr_number = os.getenv("INPUT_PR_NUMBER", "")
-        pr_number = int(pr_number) if pr_number else None
-        await run_janitor(repo, github_token, threshold, pr_number)
+        target_number = os.getenv("INPUT_TARGET_NUMBER", "")
+        target_number = int(target_number) if target_number else None
+        await run_janitor(repo, github_token, threshold, target_number)
         
     elif task == "scheduled_janitor":
         from .janitor import run_scheduled_janitor

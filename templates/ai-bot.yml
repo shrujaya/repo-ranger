@@ -2,6 +2,8 @@ name: RepoRanger
 on:
   pull_request:
     types: [opened]
+  issues:
+    types: [opened]
   schedule:
     - cron: '0 0 * * *'
   workflow_dispatch:
@@ -9,8 +11,8 @@ on:
       task:
         description: 'Task to run (review/janitor)'
         default: 'review'
-      pr_number:
-        description: 'PR number to review'
+      target_number:
+        description: 'PR or Issue number to act on'
         required: false
 
 jobs:
@@ -18,6 +20,7 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       pull-requests: write
+      issues: write
       contents: write
     steps:
       - name: Checkout Monorepo
@@ -30,8 +33,8 @@ jobs:
       - name: Run RepoRanger Worker
         uses: ./reporanger/worker
         with:
-          task: ${{ github.event.inputs.task || (github.event_name == 'schedule' && 'scheduled_janitor' || 'review') }}
-          pr_number: ${{ github.event.pull_request.number || github.event.inputs.pr_number }}
+          task: ${{ github.event.inputs.task || (github.event_name == 'schedule' && 'scheduled_janitor' || (github.event_name == 'issues' && 'janitor' || 'review')) }}
+          target_number: ${{ github.event.issue.number || github.event.pull_request.number || github.event.inputs.target_number }}
         env:
           GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
           DISPATCHER_URL: 'https://repo-ranger-dispatcher.vercel.app' # Replace with actual Vercel URL
