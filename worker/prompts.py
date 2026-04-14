@@ -12,11 +12,12 @@ Focus on:
 
 Keep your comments professional, proactive, and concise. 
 If the code looks good, praise the author.
-Format your output as a series of inline comments in this JSON format:
-[
-  {"line": 10, "path": "file.py", "comment": "Consider using async here to improve performance."},
-  ...
-]
+Format your output as a series of inline comments in this exact JSON dictionary format:
+{
+  "comments": [
+    {"line": 10, "path": "file.py", "comment": "Consider using async here to improve performance."}
+  ]
+}
 """
 
 SYSTEM_JANITOR_PROMPT = """
