@@ -39,23 +39,32 @@ async def run_review(pr_number: int, repo_full_name: str, github_token: str, gro
         "Accept": "application/vnd.github.v3+json"
     }
     
-    # If no specific comments, post a general summary
-    review_payload = {
-        "body": "🤖 **RepoRanger AI Code Review**\n\nI've analyzed your changes for logic, security, and performance. See my inline feedback below.",
-        "event": "COMMENT",
-        "comments": comments
-    }
+    # 4. Formulate the Markdown Body
+    body_text = "🤖 **RepoRanger AI Code Review**\n\n"
     
-    if not comments:
-        review_payload["body"] = "🤖 **RepoRanger AI Code Review**\n\nLGTM! I've analyzed the architectural changes and everything looks solid. Keep up the great work!"
-        review_payload["event"] = "APPROVE"
-        del review_payload["comments"]
+    if comments:
+        body_text += "I've analyzed your changes for logic, security, and performance. Here is my feedback:\n\n"
+        for c in comments:
+            path = c.get("path", "file")
+            line = c.get("line", "?")
+            comment_text = c.get("comment", "")
+            body_text += f"- **{path}** (Line {line}): {comment_text}\n"
+        event_type = "COMMENT"
+    else:
+        body_text += "LGTM! I've analyzed the architectural changes and everything looks solid. Keep up the great work!"
+        event_type = "APPROVE"
+
+    review_payload = {
+        "body": body_text,
+        "event": event_type
+    }
 
     async with httpx.AsyncClient() as http_client:
-        await http_client.post(
+        resp = await http_client.post(
             f"https://api.github.com/repos/{repo_full_name}/pulls/{pr_number}/reviews",
             headers=post_headers,
             json=review_payload
         )
+        resp.raise_for_status()
 
     print(f"Review submitted for PR #{pr_number}")
