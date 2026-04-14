@@ -30,6 +30,8 @@ runs:
       env:
         GITHUB_TOKEN: ${{ github.token }}
         GROQ_API_KEY: ${{ env.GROQ_API_KEY }}
+        DELETE_SECRET: ${{ env.DELETE_SECRET }}
+        DISPATCHER_URL: ${{ env.DISPATCHER_URL }}
         INPUT_TASK: ${{ inputs.task }}
         INPUT_PR_NUMBER: ${{ inputs.pr_number }}
         INPUT_DEAD_BRANCH_THRESHOLD: ${{ inputs.dead_branch_threshold }}

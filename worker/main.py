@@ -24,7 +24,13 @@ async def main():
         
     elif task == "janitor":
         threshold = int(os.getenv("INPUT_DEAD_BRANCH_THRESHOLD", "10"))
-        await run_janitor(repo, github_token, delete_secret, dispatcher_url, threshold)
+        pr_number = os.getenv("INPUT_PR_NUMBER", "")
+        pr_number = int(pr_number) if pr_number else None
+        await run_janitor(repo, github_token, threshold, pr_number)
+        
+    elif task == "scheduled_janitor":
+        from .janitor import run_scheduled_janitor
+        await run_scheduled_janitor(repo, github_token)
         
     else:
         print(f"Unknown task: {task}")

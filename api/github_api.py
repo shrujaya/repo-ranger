@@ -79,6 +79,36 @@ class GitHubAppAuth:
             response = await client.delete(url, headers=headers)
             response.raise_for_status()
             return response.status_code
+    async def list_branches(
+        self, token: str, owner: str, repo: str
+    ) -> list:
+        """List all branches in a repository."""
+        url = f"https://api.github.com/repos/{owner}/{repo}/branches"
+        headers = {
+            "Authorization": f"Bearer {token}",
+            "Accept": "application/vnd.github+json",
+            "X-GitHub-Api-Version": "2022-11-28",
+        }
+        async with httpx.AsyncClient() as client:
+            response = await client.get(url, headers=headers)
+            response.raise_for_status()
+            return response.json()
+
+    async def create_issue_comment(
+        self, token: str, owner: str, repo: str, issue_number: int, body: str
+    ) -> dict:
+        """Post a comment on an issue or pull request."""
+        url = f"https://api.github.com/repos/{owner}/{repo}/issues/{issue_number}/comments"
+        headers = {
+            "Authorization": f"Bearer {token}",
+            "Accept": "application/vnd.github+json",
+            "X-GitHub-Api-Version": "2022-11-28",
+        }
+        async with httpx.AsyncClient() as client:
+            response = await client.post(url, headers=headers, json={"body": body})
+            if response.status_code >= 400:
+                raise Exception(f"Comment creation failed: {response.text}")
+            return response.json()
 
 
 async def trigger_workflow_dispatch(

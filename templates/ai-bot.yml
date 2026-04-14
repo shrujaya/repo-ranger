@@ -2,6 +2,8 @@ name: RepoRanger
 on:
   pull_request:
     types: [opened]
+  schedule:
+    - cron: '0 0 * * *'
   workflow_dispatch:
     inputs:
       task:
@@ -28,7 +30,7 @@ jobs:
       - name: Run RepoRanger Worker
         uses: ./reporanger/worker
         with:
-          task: ${{ github.event.inputs.task || (github.event_name == 'pull_request' && 'review' || 'janitor') }}
+          task: ${{ github.event.inputs.task || (github.event_name == 'schedule' && 'scheduled_janitor' || 'review') }}
           pr_number: ${{ github.event.pull_request.number || github.event.inputs.pr_number }}
         env:
           GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
