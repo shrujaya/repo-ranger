@@ -82,7 +82,7 @@ async def webhook_handler(
         messages = []
         
         # --- App installation → onboarding PR ---
-        if "installation" in event and action == "created":
+        if "installation" in event and action == "created" and "comment" not in event:
             installation_id = event["installation"]["id"]
             for repo in event.get("repositories", []):
                 owner, repo_name = repo["full_name"].split("/")
@@ -199,7 +199,7 @@ async def webhook_handler(
                 messages.append(f"Triggered merged-but-not-deleted check on Issue #{issue_number}")
 
         # --- Issue Comment created → Branch Deletion + Pause/Resume/Stop ---
-        elif "issue_comment" in event and action == "created":
+        elif "comment" in event and action == "created":
             comment_body = event["comment"]["body"].strip()
             author_association = event["comment"]["author_association"]
             # Only allow privileged actions from owners/members/collaborators
