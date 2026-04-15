@@ -2,39 +2,71 @@ import os
 import asyncio
 import sys
 from .reviewer import run_review
-from .janitor import run_janitor
+from .janitor import (
+    run_janitor,
+    run_scheduled_janitor,
+    run_delete_all_dead,
+    run_protect_branch,
+    run_branch_stats,
+    run_unmerged_report,
+    run_author_report,
+    run_check_merged,
+)
+
 
 async def main():
     task = os.getenv("INPUT_TASK", "review")
     repo = os.getenv("GITHUB_REPOSITORY")
     github_token = os.getenv("GITHUB_TOKEN")
     groq_api_key = os.getenv("GROQ_API_KEY")
-    
-    # Internal variables for janitor
-    delete_secret = os.getenv("DELETE_SECRET", "ranger-danger")
-    dispatcher_url = os.getenv("DISPATCHER_URL", "https://reporanger.vercel.app")
-    
+
+    # Shared janitor env
+    target_number_raw = os.getenv("INPUT_TARGET_NUMBER", "")
+    target_number = int(target_number_raw) if target_number_raw else None
+    threshold = int(os.getenv("INPUT_DEAD_BRANCH_THRESHOLD", "10"))
+
+    # ------------------------------------------------------------------ #
     if task == "review":
         pr_number = int(os.getenv("INPUT_PR_NUMBER", "0"))
         if not pr_number:
             print("Error: pr_number input is required for review task.")
             sys.exit(1)
-            
         await run_review(pr_number, repo, github_token, groq_api_key)
-        
+
+    # --- original janitor ---
     elif task == "janitor":
-        threshold = int(os.getenv("INPUT_DEAD_BRANCH_THRESHOLD", "10"))
-        target_number = os.getenv("INPUT_TARGET_NUMBER", "")
-        target_number = int(target_number) if target_number else None
         await run_janitor(repo, github_token, threshold, target_number)
-        
+
     elif task == "scheduled_janitor":
-        from .janitor import run_scheduled_janitor
         await run_scheduled_janitor(repo, github_token)
-        
+
+    # --- new janitor commands ---
+    elif task == "delete_all_dead":
+        await run_delete_all_dead(repo, github_token, threshold, target_number)
+
+    elif task == "protect_branch":
+        branch_name = os.getenv("INPUT_BRANCH_NAME", "")
+        if not branch_name:
+            print("Error: INPUT_BRANCH_NAME is required for protect_branch task.")
+            sys.exit(1)
+        await run_protect_branch(repo, github_token, branch_name, target_number)
+
+    elif task == "branch_stats":
+        await run_branch_stats(repo, github_token, threshold, target_number)
+
+    elif task == "unmerged_report":
+        await run_unmerged_report(repo, github_token, threshold, target_number)
+
+    elif task == "author_report":
+        await run_author_report(repo, github_token, threshold, target_number)
+
+    elif task == "check_merged":
+        await run_check_merged(repo, github_token, target_number)
+
     else:
         print(f"Unknown task: {task}")
         sys.exit(1)
+
 
 if __name__ == "__main__":
     asyncio.run(main())

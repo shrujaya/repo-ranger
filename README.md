@@ -8,7 +8,7 @@ RepoRanger is a "Dispatcher-Worker" relay model GitHub App that provides AI-powe
 
 - **🛡️ Distributed Monorepo Model**: The Dispatcher routes webhooks; the Worker (running in your Repo) does the heavy lifting.
 - **🤖 AI PR Reviewer**: Powered by Groq (Llama-3-8b) for lightning-fast, senior-level architectural feedback.
-- **🧹 Branch Janitor**: Automatically identifies stale branches and provides signed deletion links to keep your repo clean.
+- **🧹 Branch Janitor**: Automatically identifies stale branches, posts rich hygiene reports, and provides signed deletion links.
 - **💰 Zero Infrastructure Costs**: Built to run on Vercel (Free Tier) and GitHub Actions.
 - **🔐 Privacy First**: RepoRanger never handles your `GROQ_API_KEY`. It stays in your GitHub Secrets.
 
@@ -39,7 +39,75 @@ You must set the following **Environment Variables** in your Vercel project sett
 - **Webhooks**: Point to `https://your-vercel-app.com/webhook`.
 
 ### 3. Usage
-Once installed, RepoRanger will automatically open a **Welcome PR** with instructions to add your `GROQ_API_KEY` to your secrets. 
+Once installed, RepoRanger will automatically open a **Welcome PR** with instructions to add your `GROQ_API_KEY` to your secrets.
+
+---
+
+## 🧹 Dead Branch Janitor — Command Reference
+
+All commands are activated by including a keyword in the **title or body of a GitHub Issue**. After the initial report, admins can reply in the **issue comments** to take action.
+
+> **Note:** `<N>` is always a number of days. Branch names can contain letters, numbers, `/`, `.`, `_`, and `-`.
+
+---
+
+### 📋 Reporting Commands
+
+Open a new Issue containing any of these keywords to trigger a report.
+
+| Keyword | What it does |
+|---------|--------------|
+| `dead+branches=<N>` | One-off scan — posts a list of all branches inactive for more than `N` days. |
+| `branch+stats=<N>` | Detailed report — shows a table with last author, exact age, and last commit date for all stale branches. |
+| `unmerged+only=<N>` | Reports only stale branches that have **not** been merged into the default branch (safe to review before deleting). |
+| `author+report=<N>` | Groups stale branches **by last committer** — great for pinging team members to clean up their own branches. |
+| `check+merged` | Reports branches that were already **fully merged** into the default branch but were never deleted ("ghost branches"). |
+
+---
+
+### ⏰ Scheduled Scanning
+
+| Keyword | What it does |
+|---------|--------------|
+| `check+dead=<N>` | Sets up a **recurring scan** every `N` days. RepoRanger will post a fresh dead-branch report to this issue on each scheduled run. |
+
+Once set up, you can control the schedule by replying to the issue with:
+
+| Comment | What it does |
+|---------|--------------|
+| `pause+janitor` | ⏸ Pauses all future scheduled reports on this issue. Adds a `janitor-paused` label. |
+| `resume+janitor` | ▶ Resumes scheduled reports. Removes the `janitor-paused` label. |
+| `stop+janitor` | 🛑 Permanently stops scanning and **closes** this tracking issue. |
+
+---
+
+### 🔒 Branch Protection
+
+| Keyword | What it does |
+|---------|--------------|
+| `protect+branch=<branch-name>` | Marks a branch as protected — the janitor will **never flag or delete** it. Adds a `protected:<branch-name>` label to persist this across runs. To unprotect, manually remove the label. |
+
+---
+
+### 🗑️ Deletion Commands
+
+| Trigger | Who | What it does |
+|---------|-----|--------------|
+| Reply with exact `branch-name` in a comment | Owner / Member / Collaborator | Deletes that **single branch** immediately. |
+| `delete+all+dead=<N>` in Issue body | Owner / Member / Collaborator | ⚠️ Nukes **all** branches older than `N` days in one shot. Posts a deletion report. |
+
+> ⚠️ **Warning:** `delete+all+dead` is irreversible. Use with care. Protected branches (`main`, `master`, `develop`, and any `protect+branch`-labelled branches) are always skipped.
+
+---
+
+### 🏷️ Labels Created by the Janitor
+
+| Label | Meaning |
+|-------|---------|
+| `janitor-paused` | Scheduled scans are paused on this issue. |
+| `protected:<branch-name>` | This branch will never be flagged or deleted by the janitor. |
+
+---
 
 ## ⚖️ License
 Apache 2.0

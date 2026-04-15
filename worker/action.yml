@@ -12,6 +12,10 @@ inputs:
     description: 'Days before a branch is considered stale'
     required: false
     default: '10'
+  branch_name:
+    description: 'Branch name for protect_branch task'
+    required: false
+    default: ''
 runs:
   using: 'composite'
   steps:
@@ -35,3 +39,4 @@ runs:
         INPUT_TASK: ${{ inputs.task }}
         INPUT_TARGET_NUMBER: ${{ inputs.target_number }}
         INPUT_DEAD_BRANCH_THRESHOLD: ${{ inputs.dead_branch_threshold }}
+        INPUT_BRANCH_NAME: ${{ inputs.branch_name }}

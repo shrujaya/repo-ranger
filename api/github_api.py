@@ -110,6 +110,110 @@ class GitHubAppAuth:
                 raise Exception(f"Comment creation failed: {response.text}")
             return response.json()
 
+    async def get_issue_labels(
+        self, token: str, owner: str, repo: str, issue_number: int
+    ) -> list:
+        """Return a list of label names on the given issue."""
+        url = f"https://api.github.com/repos/{owner}/{repo}/issues/{issue_number}/labels"
+        headers = {
+            "Authorization": f"Bearer {token}",
+            "Accept": "application/vnd.github+json",
+            "X-GitHub-Api-Version": "2022-11-28",
+        }
+        async with httpx.AsyncClient() as client:
+            response = await client.get(url, headers=headers)
+            response.raise_for_status()
+            return [lbl["name"] for lbl in response.json()]
+
+    async def add_label(
+        self, token: str, owner: str, repo: str, issue_number: int, label: str
+    ) -> None:
+        """Create a label (if missing) then apply it to the given issue."""
+        gh_headers = {
+            "Authorization": f"Bearer {token}",
+            "Accept": "application/vnd.github+json",
+            "X-GitHub-Api-Version": "2022-11-28",
+        }
+        async with httpx.AsyncClient() as client:
+            # Ensure the label exists in the repo (idempotent)
+            await client.post(
+                f"https://api.github.com/repos/{owner}/{repo}/labels",
+                headers=gh_headers,
+                json={"name": label, "color": "ededed"},
+            )
+            # Apply it to the issue
+            resp = await client.post(
+                f"https://api.github.com/repos/{owner}/{repo}/issues/{issue_number}/labels",
+                headers=gh_headers,
+                json={"labels": [label]},
+            )
+            if resp.status_code >= 400:
+                raise Exception(f"Failed to add label '{label}': {resp.text}")
+
+    async def remove_label(
+        self, token: str, owner: str, repo: str, issue_number: int, label: str
+    ) -> None:
+        """Remove a label from the given issue (no-op if not present)."""
+        url = f"https://api.github.com/repos/{owner}/{repo}/issues/{issue_number}/labels/{label}"
+        headers = {
+            "Authorization": f"Bearer {token}",
+            "Accept": "application/vnd.github+json",
+            "X-GitHub-Api-Version": "2022-11-28",
+        }
+        async with httpx.AsyncClient() as client:
+            await client.delete(url, headers=headers)  # 404 is fine — label wasn't there
+
+    async def close_issue(
+        self, token: str, owner: str, repo: str, issue_number: int
+    ) -> None:
+        """Close an issue."""
+        url = f"https://api.github.com/repos/{owner}/{repo}/issues/{issue_number}"
+        headers = {
+            "Authorization": f"Bearer {token}",
+            "Accept": "application/vnd.github+json",
+            "X-GitHub-Api-Version": "2022-11-28",
+        }
+        async with httpx.AsyncClient() as client:
+            resp = await client.patch(url, headers=headers, json={"state": "closed"})
+            if resp.status_code >= 400:
+                raise Exception(f"Failed to close issue #{issue_number}: {resp.text}")
+
+    async def compare_branches(
+        self, token: str, owner: str, repo: str, base: str, head: str
+    ) -> dict:
+        """Compare two branches; returns a dict with 'ahead_by', 'behind_by', 'status'."""
+        url = f"https://api.github.com/repos/{owner}/{repo}/compare/{base}...{head}"
+        headers = {
+            "Authorization": f"Bearer {token}",
+            "Accept": "application/vnd.github+json",
+            "X-GitHub-Api-Version": "2022-11-28",
+        }
+        async with httpx.AsyncClient() as client:
+            resp = await client.get(url, headers=headers)
+            if resp.status_code != 200:
+                return {"ahead_by": -1, "behind_by": -1, "status": "unknown"}
+            data = resp.json()
+            return {
+                "ahead_by": data.get("ahead_by", 0),
+                "behind_by": data.get("behind_by", 0),
+                "status": data.get("status", "unknown"),
+            }
+
+    async def get_default_branch(
+        self, token: str, owner: str, repo: str
+    ) -> str:
+        """Return the default branch name (usually 'main' or 'master')."""
+        url = f"https://api.github.com/repos/{owner}/{repo}"
+        headers = {
+            "Authorization": f"Bearer {token}",
+            "Accept": "application/vnd.github+json",
+            "X-GitHub-Api-Version": "2022-11-28",
+        }
+        async with httpx.AsyncClient() as client:
+            resp = await client.get(url, headers=headers)
+            resp.raise_for_status()
+            return resp.json().get("default_branch", "main")
+
 
 async def trigger_workflow_dispatch(
     token: str,
