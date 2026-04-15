@@ -53,7 +53,7 @@ async def run_janitor(repo_full_name: str, github_token: str, threshold_days: in
                 })
 
     if not stale_branches:
-        msg = "🎉 **The forest is clean!** I checked for branches older than 10 days, and there are none."
+        msg = f"🎉 **The forest is clean!** I checked for branches older than {threshold_days} days, and there are none."
     else:
         msg = f"## 🌳 RepoRanger Dead Branch Report\n\nI found the following branches that haven't been touched in over {threshold_days} days:\n\n"
         for b in stale_branches:
