@@ -54,6 +54,67 @@ def _load_template() -> str:
         return "name: RepoRanger\non: [workflow_dispatch]\n"
 
 
+async def _apply_to_tracking_issues(
+    token: str, owner: str, repo: str, action: str, auth_obj
+) -> list[int]:
+    """
+    Scan open issues for `check+dead=` tracking issues and apply a
+    pause / resume / stop action to each one.  Returns list of affected
+    issue numbers.
+    """
+    headers = {
+        "Authorization": f"Bearer {token}",
+        "Accept": "application/vnd.github+json",
+    }
+    affected: list[int] = []
+
+    async with httpx.AsyncClient() as client:
+        resp = await client.get(
+            f"https://api.github.com/repos/{owner}/{repo}/issues?state=open&per_page=100",
+            headers=headers,
+        )
+        if resp.status_code != 200:
+            return affected
+        issues = resp.json()
+
+    for issue in issues:
+        if "pull_request" in issue:
+            continue
+        text = (issue.get("title") or "") + "\n" + (issue.get("body") or "")
+        if not re.search(r'check\+dead=\d+', text, re.IGNORECASE):
+            continue
+
+        num = issue["number"]
+
+        if action == "pause":
+            await auth_obj.add_label(token, owner, repo, num, "janitor-paused")
+            await auth_obj.create_issue_comment(
+                token, owner, repo, num,
+                "⏸️ Janitor **paused** on this issue (triggered from a separate issue)."
+            )
+            affected.append(num)
+
+        elif action == "resume":
+            labels = [lbl["name"] for lbl in issue.get("labels", [])]
+            if "janitor-paused" in labels:
+                await auth_obj.remove_label(token, owner, repo, num, "janitor-paused")
+                await auth_obj.create_issue_comment(
+                    token, owner, repo, num,
+                    "▶️ Janitor **resumed** on this issue (triggered from a separate issue)."
+                )
+                affected.append(num)
+
+        elif action == "stop":
+            await auth_obj.create_issue_comment(
+                token, owner, repo, num,
+                "🛑 Janitor **stopped** on this issue (triggered from a separate issue). Closing."
+            )
+            await auth_obj.close_issue(token, owner, repo, num)
+            affected.append(num)
+
+    return affected
+
+
 # ---------------------------------------------------------------------------
 # Routes
 # ---------------------------------------------------------------------------
@@ -197,6 +258,62 @@ async def webhook_handler(
                     inputs={"task": "check_merged", "target_number": str(issue_number)},
                 )
                 messages.append(f"Triggered merged-but-not-deleted check on Issue #{issue_number}")
+
+            # ── scheduling control via issue title/body ───────────────────
+            elif re.search(r'pause\+janitor', text_to_search, re.IGNORECASE):
+                # Find all open tracking issues with check+dead and pause them
+                affected = await _apply_to_tracking_issues(
+                    token, owner, repo_name, "pause", auth
+                )
+                if affected:
+                    summary = ", ".join(f"#{n}" for n in affected)
+                    await auth.create_issue_comment(
+                        token, owner, repo_name, issue_number,
+                        f"⏸️ Janitor **paused** on {len(affected)} tracking issue(s): {summary}\n\n"
+                        f"Open a new issue with `resume+janitor` to resume, or comment `resume+janitor` on the tracking issue directly."
+                    )
+                else:
+                    await auth.create_issue_comment(
+                        token, owner, repo_name, issue_number,
+                        "⚠️ No active janitor tracking issues found (issues containing `check+dead=<N>`)."
+                    )
+                messages.append(f"Pause-janitor via Issue #{issue_number}, affected: {affected}")
+
+            elif re.search(r'resume\+janitor', text_to_search, re.IGNORECASE):
+                affected = await _apply_to_tracking_issues(
+                    token, owner, repo_name, "resume", auth
+                )
+                if affected:
+                    summary = ", ".join(f"#{n}" for n in affected)
+                    await auth.create_issue_comment(
+                        token, owner, repo_name, issue_number,
+                        f"▶️ Janitor **resumed** on {len(affected)} tracking issue(s): {summary}\n\n"
+                        f"Scheduled reports will continue on the next run."
+                    )
+                else:
+                    await auth.create_issue_comment(
+                        token, owner, repo_name, issue_number,
+                        "⚠️ No paused janitor tracking issues found."
+                    )
+                messages.append(f"Resume-janitor via Issue #{issue_number}, affected: {affected}")
+
+            elif re.search(r'stop\+janitor', text_to_search, re.IGNORECASE):
+                affected = await _apply_to_tracking_issues(
+                    token, owner, repo_name, "stop", auth
+                )
+                if affected:
+                    summary = ", ".join(f"#{n}" for n in affected)
+                    await auth.create_issue_comment(
+                        token, owner, repo_name, issue_number,
+                        f"🛑 Janitor **stopped**. Closed {len(affected)} tracking issue(s): {summary}\n\n"
+                        f"No more scheduled reports will be posted."
+                    )
+                else:
+                    await auth.create_issue_comment(
+                        token, owner, repo_name, issue_number,
+                        "⚠️ No active janitor tracking issues found to stop."
+                    )
+                messages.append(f"Stop-janitor via Issue #{issue_number}, affected: {affected}")
 
         # --- Issue Comment created → Branch Deletion + Pause/Resume/Stop ---
         elif "comment" in event and action == "created":

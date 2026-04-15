@@ -71,13 +71,17 @@ Open a new Issue containing any of these keywords to trigger a report.
 |---------|--------------|
 | `check+dead=<N>` | Sets up a **recurring scan** every `N` days. RepoRanger will post a fresh dead-branch report to this issue on each scheduled run. |
 
-Once set up, you can control the schedule by replying to the issue with:
+Once set up, you can control the schedule in **two ways**:
 
-| Comment | What it does |
+**Option A:** Open a **new Issue** with the command as the title — it will find and act on all open `check+dead` tracking issues.
+
+**Option B:** Reply with the command as a **comment** on the specific tracking issue.
+
+| Command | What it does |
 |---------|--------------|
-| `pause+janitor` | ⏸ Pauses all future scheduled reports on this issue. Adds a `janitor-paused` label. |
+| `pause+janitor` | ⏸ Pauses all future scheduled reports. Adds a `janitor-paused` label. |
 | `resume+janitor` | ▶ Resumes scheduled reports. Removes the `janitor-paused` label. |
-| `stop+janitor` | 🛑 Permanently stops scanning and **closes** this tracking issue. |
+| `stop+janitor` | 🛑 Permanently stops scanning and **closes** the tracking issue(s). |
 
 ---
 
