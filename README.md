@@ -1,117 +1,125 @@
-# 🌳 RepoRanger
+<div align="center">
+  <img src="https://github.githubassets.com/images/modules/logos_page/GitHub-Mark.png" width="120" alt="RepoRanger Logo"/>
+  <h1>🌳 RepoRanger</h1>
+  <p><strong>The Zero-Cost, Privacy-First Repository Guardian</strong></p>
+  
+  [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+  [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](#)
+</div>
 
-**The Zero-Cost, Privacy-First Repository Guardian**
+---
 
-RepoRanger is a "Dispatcher-Worker" relay model GitHub App that provides AI-powered code reviews and automated branch hygiene. Unlike other services, RepoRanger runs on *your* infrastructure (GitHub Actions), ensuring your code and secrets never leave your environment.
+**RepoRanger** is a powerful "Dispatcher-Worker" GitHub App that provides **AI-powered code reviews** and automated **branch hygiene**. 
 
-## 🚀 Key Features
+Unlike other SaaS solutions, RepoRanger runs entirely on *your* infrastructure (GitHub Actions) using a relay model. This guarantees that your code, IP, and secrets **never leave your environment**.
 
-- **🛡️ Distributed Monorepo Model**: The Dispatcher routes webhooks; the Worker (running in your Repo) does the heavy lifting.
-- **🤖 AI PR Reviewer**: Powered by Groq (Llama-3-8b) for lightning-fast, senior-level architectural feedback.
-- **🧹 Branch Janitor**: Automatically identifies stale branches, posts rich hygiene reports, and provides signed deletion links.
-- **💰 Zero Infrastructure Costs**: Built to run on Vercel (Free Tier) and GitHub Actions.
-- **🔐 Privacy First**: RepoRanger never handles your `GROQ_API_KEY`. It stays in your GitHub Secrets.
+---
+
+## ✨ Why RepoRanger?
+
+* 💸 **Zero Infrastructure Costs:** Designed to run 100% on the Vercel Free Tier and GitHub Actions.
+* 🔐 **Privacy First:** Your `GROQ_API_KEY` stays safely in your GitHub Secrets.
+* ⚡ **Senior-Level Feedback:** Powered by Groq (Llama-3-8b) for lightning-fast, ultra-low latency code reviews.
+* 🧹 **Automated Janitor:** Keep your repository spotless with rich branch hygiene reports and signed deletion links.
+* 🛡️ **Distributed Security:** The Dispatcher only routes webhooks; the Worker inside your repo does all the heavy lifting.
+
+---
 
 ## 🛠️ Architecture
 
+A lightweight Vercel app acts as the **Dispatcher** receiving GitHub Webhooks, while a GitHub Action within your repository acts as the **Worker**, securely performing AI and repository operations.
+
 ```mermaid
 graph TD
-    A[GitHub Event] --> B(Dispatcher - FastAPI/Vercel)
+    classDef highlight fill:#f9f9f9,stroke:#333,stroke-width:2px;
+    A[GitHub Event] -->|Webhook| B(Dispatcher<br/>FastAPI on Vercel)
+    
     B --> C{Event Type}
+    
     C -- installation.created --> D[Onboarding PR + ai-bot.yml]
-    C -- pull_request.opened --> E[Trigger GitHub Action]
-    E --> F[Worker - Groq AI]
-    F --> G[Review Comments / Hygiene Report]
+    C -- pull_request.opened --> E[Trigger GitHub Action<br/>workflow_dispatch]
+    
+    E --> F[Worker<br/>Groq AI / Action]
+    F -->|Posts Feedback| G[Review Comments &<br/>Hygiene Reports]
+    
+    class A,B,D,E,F,G highlight;
 ```
 
-## 📦 Setup Instructions
+---
 
-### 1. Deploy the API to Vercel
-Deploy the entire repository to Vercel. Vercel will automatically detect the Python app because of the `vercel.json` config mapping routes to `/api/index.py`.
-You must set the following **Environment Variables** in your Vercel project settings:
+## 🚀 Getting Started
+
+### 1. Deploy the Dispatcher to Vercel
+Deploy the root of this repository to Vercel. Thanks to `vercel.json`, it will automatically detect the Python app.
+You must set these **Environment Variables** in your Vercel project:
 - `APP_ID`: Your GitHub App ID.
-- `GITHUB_APP_PRIVATE_KEY`: Your GitHub App private key (paste the entire contents of the `.pem` file).
+- `GITHUB_APP_PRIVATE_KEY`: Your GitHub App private key (paste the entire `.pem` file contents).
 - `WEBHOOK_SECRET`: Your GitHub App webhook secret.
-- `DELETE_SECRET`: A custom string for branch deletion link signatures (e.g., `my-super-secret`).
+- `DELETE_SECRET`: A custom string for branch deletion link signatures (e.g., `my-super-secret-key-123`).
 
-### 2. Configure GitHub App
-- **Permissions**: Pull Requests (R/W), Contents (R/W), Actions (R/W), Issues (R/W).
-- **Webhooks**: Point to `https://your-vercel-app.com/webhook`.
+### 2. Configure Your GitHub App
+- **Permissions Required**: 
+  - `Pull Requests` (Read & Write)
+  - `Contents` (Read & Write)
+  - `Actions` (Read & Write)
+  - `Issues` (Read & Write)
+- **Webhooks**: Point the Webhook URL to `https://your-vercel-app.com/webhook`.
 
-### 3. Usage
-Once installed, RepoRanger will automatically open a **Welcome PR** with instructions to add your `GROQ_API_KEY` to your secrets.
-
----
-
-## 🧹 Dead Branch Janitor — Command Reference
-
-All commands are activated by including a keyword in the **title or body of a GitHub Issue**. After the initial report, admins can reply in the **issue comments** to take action.
-
-> **Note:** `<N>` is always a number of days. Branch names can contain letters, numbers, `/`, `.`, `_`, and `-`.
+### 3. Let RepoRanger take over!
+Once installed on a repository, RepoRanger will automatically open a **Welcome PR** with setup instructions. 
+> 💡 **Tip:** Don't forget to add your `GROQ_API_KEY` to your repository secrets!
 
 ---
+
+## 🧹 The Janitor — Command Reference
+
+Keep your repository clean effortlessly! Activate commands by including keywords in the **title or body of a GitHub Issue**. Admins can interact directly via **issue comments**.
+
+> **Note:** `<N>` represents a number of days. Branch names can contain letters, numbers, `/`, `.`, `_`, and `-`.
 
 ### 📋 Reporting Commands
-
 Open a new Issue containing any of these keywords to trigger a report.
 
 | Keyword | What it does |
 |---------|--------------|
-| `dead+branches=<N>` | One-off scan — posts a list of all branches inactive for more than `N` days. |
-| `branch+stats=<N>` | Detailed report — shows a table with last author, exact age, and last commit date for all stale branches. |
-| `unmerged+only=<N>` | Reports only stale branches that have **not** been merged into the default branch (safe to review before deleting). |
-| `author+report=<N>` | Groups stale branches **by last committer** — great for pinging team members to clean up their own branches. |
-| `check+merged` | Reports branches that were already **fully merged** into the default branch but were never deleted ("ghost branches"). |
-
----
+| `dead+branches=<N>` | 🔍 Posts a list of all branches inactive for > `N` days. |
+| `branch+stats=<N>` | 📊 Detailed table showing last author, exact age, and commit date. |
+| `unmerged+only=<N>` | ⚠️ Reports only stale branches that **have not** been merged. |
+| `author+report=<N>` | 👥 Groups stale branches **by last committer**. Great for pinging the team! |
+| `check+merged` | 👻 Reports "ghost branches" that were fully merged but forgotten. |
 
 ### ⏰ Scheduled Scanning
-
 | Keyword | What it does |
 |---------|--------------|
-| `check+dead=<N>` | Sets up a **recurring scan** every `N` days. RepoRanger will post a fresh dead-branch report to this issue on each scheduled run. |
+| `check+dead=<N>` | 🔁 Sets up a **recurring scan** every `N` days. RepoRanger will post a fresh dead-branch report to this issue automatically! |
 
-Once set up, you can control the schedule in **two ways**:
-
-**Option A:** Open a **new Issue** with the command as the title — it will find and act on all open `check+dead` tracking issues.
-
-**Option B:** Reply with the command as a **comment** on the specific tracking issue.
-
-| Command | What it does |
-|---------|--------------|
-| `pause+janitor` | ⏸ Pauses all future scheduled reports. Adds a `janitor-paused` label. |
-| `resume+janitor` | ▶ Resumes scheduled reports. Removes the `janitor-paused` label. |
-| `stop+janitor` | 🛑 Permanently stops scanning and **closes** the tracking issue(s). |
-
----
+Control schedules by replying with a comment on the tracking issue:
+* `pause+janitor` ⏸ Pauses future scheduled reports.
+* `resume+janitor` ▶ Resumes scheduled reports.
+* `stop+janitor` 🛑 Permanently stops scanning and closes the tracking issue.
 
 ### 🔒 Branch Protection
-
 | Keyword | What it does |
 |---------|--------------|
-| `protect+branch=<branch-name>` | Marks a branch as protected — the janitor will **never flag or delete** it. Adds a `protected:<branch-name>` label to persist this across runs. To unprotect, manually remove the label. |
+| `protect+branch=<name>` | 🛡️ Marks a branch as protected (e.g. staging). The janitor will **never flag or delete** it. |
+
+### 🗑️ One-Click Deletions
+| Trigger | Who Can Use It | What it does |
+|---------|----------------|--------------|
+| Reply with exact `branch-name` | Owner/Member/Collaborator | 💥 Deletes that **single branch** immediately. |
+| `delete+all+dead=<N>` in Issue | Owner/Member/Collaborator | ☢️ Nukes **all** branches older than `N` days in one shot. |
+
+> ⚠️ **Warning:** `delete+all+dead` is irreversible! Protected branches (`main`, `develop`, etc.) are always skipped.
 
 ---
 
-### 🗑️ Deletion Commands
-
-| Trigger | Who | What it does |
-|---------|-----|--------------|
-| Reply with exact `branch-name` in a comment | Owner / Member / Collaborator | Deletes that **single branch** immediately. |
-| `delete+all+dead=<N>` in Issue body | Owner / Member / Collaborator | ⚠️ Nukes **all** branches older than `N` days in one shot. Posts a deletion report. |
-
-> ⚠️ **Warning:** `delete+all+dead` is irreversible. Use with care. Protected branches (`main`, `master`, `develop`, and any `protect+branch`-labelled branches) are always skipped.
-
----
-
-### 🏷️ Labels Created by the Janitor
-
-| Label | Meaning |
-|-------|---------|
-| `janitor-paused` | Scheduled scans are paused on this issue. |
-| `protected:<branch-name>` | This branch will never be flagged or deleted by the janitor. |
+## 🛠️ Built With
+- [FastAPI](https://fastapi.tiangolo.com/)
+- [Vercel](https://vercel.com/)
+- [GitHub Actions](https://github.com/features/actions)
+- [Groq 🚀](https://groq.com/)
 
 ---
 
 ## ⚖️ License
-MIT
+Released under the [MIT License](LICENSE).
