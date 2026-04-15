@@ -114,4 +114,4 @@ Once set up, you can control the schedule in **two ways**:
 ---
 
 ## ⚖️ License
-Apache 2.0
+MIT
