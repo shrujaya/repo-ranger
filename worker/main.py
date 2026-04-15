@@ -27,9 +27,9 @@ async def main():
 
     # ------------------------------------------------------------------ #
     if task == "review":
-        pr_number = int(os.getenv("INPUT_PR_NUMBER", "0"))
+        pr_number = target_number or 0
         if not pr_number:
-            print("Error: pr_number input is required for review task.")
+            print("Error: target_number input is required for review task.")
             sys.exit(1)
         await run_review(pr_number, repo, github_token, groq_api_key)
 
