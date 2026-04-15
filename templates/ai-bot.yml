@@ -14,6 +14,14 @@ on:
       target_number:
         description: 'PR or Issue number to act on'
         required: false
+      dead_branch_threshold:
+        description: 'Days before a branch is considered stale'
+        required: false
+        default: '10'
+      branch_name:
+        description: 'Branch name for protect_branch task'
+        required: false
+        default: ''
 
 jobs:
   reporanger:
@@ -35,6 +43,8 @@ jobs:
         with:
           task: ${{ github.event.inputs.task || (github.event_name == 'schedule' && 'scheduled_janitor' || (github.event_name == 'issues' && 'janitor' || 'review')) }}
           target_number: ${{ github.event.issue.number || github.event.pull_request.number || github.event.inputs.target_number }}
+          dead_branch_threshold: ${{ github.event.inputs.dead_branch_threshold || '10' }}
+          branch_name: ${{ github.event.inputs.branch_name || '' }}
         env:
           GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
           DISPATCHER_URL: 'https://repo-ranger-dispatcher.vercel.app' # Replace with actual Vercel URL
