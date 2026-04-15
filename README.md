@@ -1,5 +1,5 @@
 <div align="center">
-  <img src="https://github.githubassets.com/images/modules/logos_page/GitHub-Mark.png" width="120" alt="RepoRanger Logo"/>
+  <img src="./logo.png" width="120" alt="RepoRanger Logo"/>
   <h1>🌳 RepoRanger</h1>
   <p><strong>The Zero-Cost, Privacy-First Repository Guardian</strong></p>
   
