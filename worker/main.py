@@ -7,7 +7,6 @@ from .janitor import (
     run_scheduled_janitor,
     run_delete_all_dead,
     run_protect_branch,
-    run_branch_stats,
     run_unmerged_report,
     run_author_report,
     run_check_merged,
@@ -59,9 +58,6 @@ async def main():
             print("Error: INPUT_BRANCH_NAME is required for protect_branch task.")
             sys.exit(1)
         await run_protect_branch(repo, github_token, branch_name, target_number)
-
-    elif task == "branch_stats":
-        await run_branch_stats(repo, github_token, threshold, target_number)
 
     elif task == "unmerged_report":
         await run_unmerged_report(repo, github_token, threshold, target_number)

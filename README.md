@@ -57,8 +57,7 @@ Open a new Issue containing any of these keywords to trigger a report.
 
 | Keyword | What it does |
 |---------|--------------|
-| `dead+branches=<N>` | One-off scan — posts a list of all branches inactive for more than `N` days. |
-| `branch+stats=<N>` | Detailed report — shows a table with last author, exact age, and last commit date for all stale branches. |
+| `dead+branches=<N>` | One-off scan — posts a list of all branches inactive for more than `N` days. Includes a detailed table with last author, exact age, and last commit date. |
 | `unmerged+only=<N>` | Reports only stale branches that have **not** been merged into the default branch (safe to review before deleting). |
 | `author+report=<N>` | Groups stale branches **by last committer** — great for pinging team members to clean up their own branches. |
 | `check+merged` | Reports branches that were already **fully merged** into the default branch but were never deleted ("ghost branches"). |

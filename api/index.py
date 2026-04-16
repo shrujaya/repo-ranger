@@ -191,7 +191,6 @@ async def webhook_handler(
             # ── new commands ───────────────────────────────────────────────
             match_delete_all  = re.search(r'delete\+all\+dead=(\d+)',           text_to_search, re.IGNORECASE)
             match_protect     = re.search(r'protect\+branch=([\w/._-]+)',        text_to_search, re.IGNORECASE)
-            match_stats       = re.search(r'branch\+stats=(\d+)',               text_to_search, re.IGNORECASE)
             match_unmerged    = re.search(r'unmerged\+only=(\d+)',               text_to_search, re.IGNORECASE)
             match_author      = re.search(r'author\+report=(\d+)',              text_to_search, re.IGNORECASE)
             match_check_merged= re.search(r'check\+merged',                     text_to_search, re.IGNORECASE)
@@ -227,14 +226,6 @@ async def webhook_handler(
                     inputs={"task": "protect_branch", "target_number": str(issue_number), "branch_name": branch_name},
                 )
                 messages.append(f"Triggered protect-branch for '{branch_name}' on Issue #{issue_number}")
-
-            elif match_stats:
-                days = match_stats.group(1)
-                await trigger_workflow_dispatch(
-                    token, owner, repo_name, "ai-bot.yml", "main",
-                    inputs={"task": "branch_stats", "target_number": str(issue_number), "dead_branch_threshold": days},
-                )
-                messages.append(f"Triggered branch stats (>{days} days) on Issue #{issue_number}")
 
             elif match_unmerged:
                 days = match_unmerged.group(1)

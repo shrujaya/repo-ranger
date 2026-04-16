@@ -160,14 +160,21 @@ async def run_janitor(
             f"{threshold_days} days, and there are none."
         )
     else:
+        stale_branches.sort(key=lambda b: b["dead_days"], reverse=True)
         msg = (
             f"## 🌳 RepoRanger Dead Branch Report\n\n"
             f"I found the following branches that haven't been touched in over "
             f"{threshold_days} days:\n\n"
+            f"| Branch | Last Author | Days Inactive | Last Commit |\n"
+            f"|--------|-------------|---------------|-------------|\n"
         )
         for b in stale_branches:
-            msg += f"- **{b['name']}** (dead for {b['dead_days']} days)\n"
-        msg += "\n> **Admins:** Reply to this comment with the exact branch name you'd like me to delete."
+            commit_date = b["last_commit"][:10]  # YYYY-MM-DD
+            msg += f"| `{b['name']}` | {b['author']} | {b['dead_days']} days | {commit_date} |\n"
+        msg += (
+            f"\n> Total stale branches: **{len(stale_branches)}**\n"
+            "> **Admins:** Reply to this comment with the exact branch name you'd like me to delete."
+        )
 
     if target_number:
         headers = _make_headers(github_token)
@@ -253,15 +260,20 @@ async def run_scheduled_janitor(repo_full_name: str, github_token: str):
                     f"{threshold_days} days, and there are none."
                 )
             else:
+                stale.sort(key=lambda b: b["dead_days"], reverse=True)
                 msg = (
                     f"## 🌳 RepoRanger Dead Branch Report\n\n"
                     f"I found the following branches that haven't been touched in over "
                     f"{threshold_days} days:\n\n"
+                    f"| Branch | Last Author | Days Inactive | Last Commit |\n"
+                    f"|--------|-------------|---------------|-------------|\n"
                 )
                 for b in stale:
-                    msg += f"- **{b['name']}** (dead for {b['dead_days']} days)\n"
+                    commit_date = b["last_commit"][:10]  # YYYY-MM-DD
+                    msg += f"| `{b['name']}` | {b['author']} | {b['dead_days']} days | {commit_date} |\n"
                 msg += (
-                    "\n> **Admins:** Reply to this comment with the exact branch name "
+                    f"\n> Total stale branches: **{len(stale)}**\n"
+                    "> **Admins:** Reply to this comment with the exact branch name "
                     "you'd like me to delete."
                 )
             await _post_comment(repo_full_name, target_number, msg, headers)
@@ -366,46 +378,6 @@ async def run_protect_branch(
 
     await _post_comment(repo_full_name, target_number, msg, headers)
     print(f"Protected branch '{branch_name}' on Issue #{target_number}")
-
-
-async def run_branch_stats(
-    repo_full_name: str,
-    github_token: str,
-    threshold_days: int,
-    target_number: int | None = None,
-):
-    """
-    Triggered by `branch+stats=<N>`.
-    Posts a detailed report with age, last author, and staleness for all
-    branches older than N days.
-    """
-    headers = _make_headers(github_token)
-    stale = await _collect_stale(repo_full_name, github_token, threshold_days)
-
-    if not stale:
-        msg = (
-            f"📊 **Branch Stats:** No branches older than {threshold_days} days. "
-            f"Your repo is in great shape! 🎉"
-        )
-    else:
-        # Sort by most stale first
-        stale.sort(key=lambda b: b["dead_days"], reverse=True)
-        msg = (
-            f"## 📊 RepoRanger Branch Stats Report\n\n"
-            f"Showing branches inactive for more than **{threshold_days} days**:\n\n"
-            f"| Branch | Last Author | Days Inactive | Last Commit |\n"
-            f"|--------|-------------|---------------|-------------|\n"
-        )
-        for b in stale:
-            commit_date = b["last_commit"][:10]  # YYYY-MM-DD
-            msg += f"| `{b['name']}` | {b['author']} | {b['dead_days']} days | {commit_date} |\n"
-        msg += f"\n> Total stale branches: **{len(stale)}**"
-
-    if target_number:
-        await _post_comment(repo_full_name, target_number, msg, headers)
-        print(f"Posted branch stats to Issue #{target_number}")
-    else:
-        print(msg)
 
 
 async def run_unmerged_report(
