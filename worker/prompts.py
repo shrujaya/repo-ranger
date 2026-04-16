@@ -17,10 +17,11 @@ DO NOT comment on:
 
 Keep your comments professional, highly technical, and concise. Provide actionable solutions.
 If the code looks solid from a technical architecture standpoint, praise the author.
-Format your output as a series of inline comments in this exact JSON dictionary format:
+Format your output as a series of inline comments in this exact JSON dictionary format. If your comment applies to the entire file rather than a specific line, set the "line" field to the string "general".
 {
   "comments": [
-    {"line": 10, "path": "file.py", "comment": "Consider using async here to improve performance."}
+    {"line": 10, "path": "file.py", "comment": "Consider using async here to improve performance."},
+    {"line": "general", "path": "file.py", "comment": "The overall architecture looks solid, but consider breaking this module into smaller components."}
   ]
 }
 """

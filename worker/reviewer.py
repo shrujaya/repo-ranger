@@ -48,7 +48,10 @@ async def run_review(pr_number: int, repo_full_name: str, github_token: str, gro
             path = c.get("path", "file")
             line = c.get("line", "?")
             comment_text = c.get("comment", "")
-            body_text += f"- **{path}** (Line {line}): {comment_text}\n"
+            if str(line).lower() == "general":
+                body_text += f"- **{path}** (General Comment): {comment_text}\n"
+            else:
+                body_text += f"- **{path}** (Line {line}): {comment_text}\n"
         event_type = "COMMENT"
     else:
         body_text += "✅ **LGTM!**\n\nI've analyzed the architectural changes, logic, and security implications of this PR. Everything looks solid and follows best practices. Keep up the great work!"
