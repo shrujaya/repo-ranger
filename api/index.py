@@ -369,6 +369,12 @@ async def webhook_handler(
                     branch_names = [b["name"] for b in branches]
 
                     if comment_body in branch_names:
+                        if comment_body in ["main", "master", "develop"]:
+                            await auth.create_issue_comment(
+                                token, owner, repo_name, issue_number,
+                                f"⚠️ Protected branch `{comment_body}` cannot be summarily deleted via issue commands."
+                            )
+                            return
                         try:
                             await auth.delete_branch(token, owner, repo_name, comment_body)
                             await auth.create_issue_comment(
