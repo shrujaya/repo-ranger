@@ -115,6 +115,80 @@ async def _apply_to_tracking_issues(
     return affected
 
 
+async def _process_report_commands(text_to_search: str, token: str, owner: str, repo_name: str, issue_number: int, messages: list, auth) -> bool:
+    match_manual = re.search(r'dead\+branches=(\d+)', text_to_search, re.IGNORECASE)
+    match_cron   = re.search(r'check\+dead=(\d+)',    text_to_search, re.IGNORECASE)
+    match_delete_all  = re.search(r'delete\+all\+dead=(\d+)',           text_to_search, re.IGNORECASE)
+    match_protect     = re.search(r'protect\+branch=([\w/._-]+)',        text_to_search, re.IGNORECASE)
+    match_unmerged    = re.search(r'unmerged\+only=(\d+)',               text_to_search, re.IGNORECASE)
+    match_author      = re.search(r'author\+report=(\d+)',              text_to_search, re.IGNORECASE)
+    match_check_merged= re.search(r'check\+merged',                     text_to_search, re.IGNORECASE)
+
+    if match_manual:
+        days = match_manual.group(1)
+        await trigger_workflow_dispatch(
+            token, owner, repo_name, "ai-bot.yml", "main",
+            inputs={"task": "janitor", "target_number": str(issue_number), "dead_branch_threshold": days},
+        )
+        messages.append(f"Triggered manual dead-branch check for {days} days on Issue #{issue_number}")
+        return True
+
+    elif match_cron:
+        days = match_cron.group(1)
+        await auth.create_issue_comment(
+            token, owner, repo_name, issue_number,
+            f"✅ Understood! I will check this repository for dead branches older than or equal to {days} days on a recurring schedule and report back here."
+        )
+        messages.append(f"Acknowledged scheduled dead-branch check for {days} days on Issue #{issue_number}")
+        return True
+
+    elif match_delete_all:
+        days = match_delete_all.group(1)
+        await trigger_workflow_dispatch(
+            token, owner, repo_name, "ai-bot.yml", "main",
+            inputs={"task": "delete_all_dead", "target_number": str(issue_number), "dead_branch_threshold": days},
+        )
+        messages.append(f"Triggered bulk deletion of branches older than {days} days on Issue #{issue_number}")
+        return True
+
+    elif match_protect:
+        branch_name = match_protect.group(1)
+        await trigger_workflow_dispatch(
+            token, owner, repo_name, "ai-bot.yml", "main",
+            inputs={"task": "protect_branch", "target_number": str(issue_number), "branch_name": branch_name},
+        )
+        messages.append(f"Triggered protect-branch for '{branch_name}' on Issue #{issue_number}")
+        return True
+
+    elif match_unmerged:
+        days = match_unmerged.group(1)
+        await trigger_workflow_dispatch(
+            token, owner, repo_name, "ai-bot.yml", "main",
+            inputs={"task": "unmerged_report", "target_number": str(issue_number), "dead_branch_threshold": days},
+        )
+        messages.append(f"Triggered unmerged-only report (>={days} days) on Issue #{issue_number}")
+        return True
+
+    elif match_author:
+        days = match_author.group(1)
+        await trigger_workflow_dispatch(
+            token, owner, repo_name, "ai-bot.yml", "main",
+            inputs={"task": "author_report", "target_number": str(issue_number), "dead_branch_threshold": days},
+        )
+        messages.append(f"Triggered author report (>={days} days) on Issue #{issue_number}")
+        return True
+
+    elif match_check_merged:
+        await trigger_workflow_dispatch(
+            token, owner, repo_name, "ai-bot.yml", "main",
+            inputs={"task": "check_merged", "target_number": str(issue_number)},
+        )
+        messages.append(f"Triggered merged-but-not-deleted check on Issue #{issue_number}")
+        return True
+
+    return False
+
+
 # ---------------------------------------------------------------------------
 # Routes
 # ---------------------------------------------------------------------------
@@ -184,71 +258,12 @@ async def webhook_handler(
 
             text_to_search = issue_title + "\n" + issue_body
 
-            # ── existing commands ──────────────────────────────────────────
-            match_manual = re.search(r'dead\+branches=(\d+)', text_to_search, re.IGNORECASE)
-            match_cron   = re.search(r'check\+dead=(\d+)',    text_to_search, re.IGNORECASE)
+            handled_report = await _process_report_commands(
+                text_to_search, token, owner, repo_name, issue_number, messages, auth
+            )
 
-            # ── new commands ───────────────────────────────────────────────
-            match_delete_all  = re.search(r'delete\+all\+dead=(\d+)',           text_to_search, re.IGNORECASE)
-            match_protect     = re.search(r'protect\+branch=([\w/._-]+)',        text_to_search, re.IGNORECASE)
-            match_unmerged    = re.search(r'unmerged\+only=(\d+)',               text_to_search, re.IGNORECASE)
-            match_author      = re.search(r'author\+report=(\d+)',              text_to_search, re.IGNORECASE)
-            match_check_merged= re.search(r'check\+merged',                     text_to_search, re.IGNORECASE)
-
-            if match_manual:
-                days = match_manual.group(1)
-                await trigger_workflow_dispatch(
-                    token, owner, repo_name, "ai-bot.yml", "main",
-                    inputs={"task": "janitor", "target_number": str(issue_number), "dead_branch_threshold": days},
-                )
-                messages.append(f"Triggered manual dead-branch check for {days} days on Issue #{issue_number}")
-
-            elif match_cron:
-                days = match_cron.group(1)
-                await auth.create_issue_comment(
-                    token, owner, repo_name, issue_number,
-                    f"✅ Understood! I will check this repository for dead branches older than {days} days on a recurring schedule and report back here."
-                )
-                messages.append(f"Acknowledged scheduled dead-branch check for {days} days on Issue #{issue_number}")
-
-            elif match_delete_all:
-                days = match_delete_all.group(1)
-                await trigger_workflow_dispatch(
-                    token, owner, repo_name, "ai-bot.yml", "main",
-                    inputs={"task": "delete_all_dead", "target_number": str(issue_number), "dead_branch_threshold": days},
-                )
-                messages.append(f"Triggered bulk deletion of branches older than {days} days on Issue #{issue_number}")
-
-            elif match_protect:
-                branch_name = match_protect.group(1)
-                await trigger_workflow_dispatch(
-                    token, owner, repo_name, "ai-bot.yml", "main",
-                    inputs={"task": "protect_branch", "target_number": str(issue_number), "branch_name": branch_name},
-                )
-                messages.append(f"Triggered protect-branch for '{branch_name}' on Issue #{issue_number}")
-
-            elif match_unmerged:
-                days = match_unmerged.group(1)
-                await trigger_workflow_dispatch(
-                    token, owner, repo_name, "ai-bot.yml", "main",
-                    inputs={"task": "unmerged_report", "target_number": str(issue_number), "dead_branch_threshold": days},
-                )
-                messages.append(f"Triggered unmerged-only report (>={days} days) on Issue #{issue_number}")
-
-            elif match_author:
-                days = match_author.group(1)
-                await trigger_workflow_dispatch(
-                    token, owner, repo_name, "ai-bot.yml", "main",
-                    inputs={"task": "author_report", "target_number": str(issue_number), "dead_branch_threshold": days},
-                )
-                messages.append(f"Triggered author report (>={days} days) on Issue #{issue_number}")
-
-            elif match_check_merged:
-                await trigger_workflow_dispatch(
-                    token, owner, repo_name, "ai-bot.yml", "main",
-                    inputs={"task": "check_merged", "target_number": str(issue_number)},
-                )
-                messages.append(f"Triggered merged-but-not-deleted check on Issue #{issue_number}")
+            if handled_report:
+                pass
 
             # ── scheduling control via issue title/body ───────────────────
             elif re.search(r'pause\+janitor', text_to_search, re.IGNORECASE):
@@ -344,6 +359,10 @@ async def webhook_handler(
                     await auth.close_issue(token, owner, repo_name, issue_number)
                     messages.append(f"Stopped and closed janitor Issue #{issue_number}")
 
+                elif await _process_report_commands(
+                    comment_body, token, owner, repo_name, issue_number, messages, auth
+                ):
+                    pass
                 # ── Branch deletion (existing) ─────────────────────────────
                 else:
                     branches = await auth.list_branches(token, owner, repo_name)
