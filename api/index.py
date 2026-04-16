@@ -233,7 +233,7 @@ async def webhook_handler(
                     token, owner, repo_name, "ai-bot.yml", "main",
                     inputs={"task": "unmerged_report", "target_number": str(issue_number), "dead_branch_threshold": days},
                 )
-                messages.append(f"Triggered unmerged-only report (>{days} days) on Issue #{issue_number}")
+                messages.append(f"Triggered unmerged-only report (>={days} days) on Issue #{issue_number}")
 
             elif match_author:
                 days = match_author.group(1)
@@ -241,7 +241,7 @@ async def webhook_handler(
                     token, owner, repo_name, "ai-bot.yml", "main",
                     inputs={"task": "author_report", "target_number": str(issue_number), "dead_branch_threshold": days},
                 )
-                messages.append(f"Triggered author report (>{days} days) on Issue #{issue_number}")
+                messages.append(f"Triggered author report (>={days} days) on Issue #{issue_number}")
 
             elif match_check_merged:
                 await trigger_workflow_dispatch(

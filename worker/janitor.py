@@ -129,7 +129,7 @@ async def _collect_stale(
         date_str = commit_data["commit"]["committer"]["date"]
         last_date = datetime.strptime(date_str, "%Y-%m-%dT%H:%M:%SZ")
         days_dead = (now - last_date).days
-        if days_dead > threshold_days:
+        if days_dead >= threshold_days:
             stale.append({
                 "name": branch_name,
                 "last_commit": date_str,
@@ -404,11 +404,11 @@ async def run_unmerged_report(
     if not unmerged:
         msg = (
             f"✅ **All stale branches are already merged!** No unmerged branches "
-            f"older than {threshold_days} days found."
+            f"older than or equal to {threshold_days} days found."
         )
     else:
         msg = (
-            f"## ⚠️ Unmerged Stale Branches (>{threshold_days} days)\n\n"
+            f"## ⚠️ Unmerged Stale Branches (>={threshold_days} days)\n\n"
             f"The following branches are **stale AND unmerged** into `{default_branch}`:\n\n"
         )
         for b in unmerged:
@@ -440,7 +440,7 @@ async def run_author_report(
 
     if not stale:
         msg = (
-            f"👥 **Author Report:** No stale branches (>{threshold_days} days) found."
+            f"👥 **Author Report:** No stale branches (>={threshold_days} days) found."
         )
     else:
         # Group by author
@@ -450,7 +450,7 @@ async def run_author_report(
 
         msg = (
             f"## 👥 RepoRanger Author Report\n\n"
-            f"Stale branches (>{threshold_days} days) grouped by last committer:\n\n"
+            f"Stale branches (>={threshold_days} days) grouped by last committer:\n\n"
         )
         for author, branches in sorted(by_author.items()):
             msg += f"### {author} ({len(branches)} branch{'es' if len(branches) > 1 else ''})\n"
