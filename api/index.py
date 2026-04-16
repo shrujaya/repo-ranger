@@ -158,8 +158,8 @@ async def webhook_handler(
                 msg = await _handle_onboarding(installation_id, owner, repo_name)
                 messages.append(msg)
 
-        # --- PR opened → trigger the worker ---
-        elif "pull_request" in event and action == "opened":
+        # --- PR opened/reopened/sync → trigger the worker ---
+        elif "pull_request" in event and action in ["opened", "reopened", "synchronize"]:
             installation_id = event["installation"]["id"]
             owner = event["repository"]["owner"]["login"]
             repo_name = event["repository"]["name"]

@@ -25,6 +25,15 @@ async def main():
     target_number = int(target_number_raw) if target_number_raw else None
     threshold = int(os.getenv("INPUT_DEAD_BRANCH_THRESHOLD", "10"))
 
+    # Validate required config
+    if not github_token:
+        print("❌ Error: GITHUB_TOKEN is missing. Check your workflow permissions.")
+        sys.exit(1)
+    
+    if task == "review" and not groq_api_key:
+        print("❌ Error: GROQ_API_KEY is missing. Add it to your repository secrets.")
+        sys.exit(1)
+
     # ------------------------------------------------------------------ #
     if task == "review":
         pr_number = target_number or 0

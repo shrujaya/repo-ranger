@@ -22,7 +22,7 @@ async def run_review(pr_number: int, repo_full_name: str, github_token: str, gro
     # 2. Get AI Review
     # We ask for a JSON object with a 'comments' array
     completion = await client.chat.completions.create(
-        model="llama-3.1-8b-instant",
+        model="llama-3.3-70b-versatile",
         messages=[
             {"role": "system", "content": SYSTEM_REVIEWER_PROMPT},
             {"role": "user", "content": f"Review this diff for PR #{pr_number}:\n\n{diff_text}"}
@@ -51,7 +51,7 @@ async def run_review(pr_number: int, repo_full_name: str, github_token: str, gro
             body_text += f"- **{path}** (Line {line}): {comment_text}\n"
         event_type = "COMMENT"
     else:
-        body_text += "LGTM! I've analyzed the architectural changes and everything looks solid. Keep up the great work!"
+        body_text += "✅ **LGTM!**\n\nI've analyzed the architectural changes, logic, and security implications of this PR. Everything looks solid and follows best practices. Keep up the great work!"
         event_type = "APPROVE"
 
     review_payload = {
