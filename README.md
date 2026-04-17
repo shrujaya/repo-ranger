@@ -89,6 +89,8 @@ Open a new Issue containing any of these keywords to trigger a report.
 | `unmerged+only=<N>` | Reports only stale branches that have **not** been merged into the default branch (safe to review before deleting). |
 | `author+report=<N>` | Groups stale branches **by last committer** — great for pinging team members to clean up their own branches. |
 | `check+merged` | Reports branches that were already **fully merged** into the default branch but were never deleted ("ghost branches"). |
+| `stale+pr=<N>` | Reports open PRs with no activity for more than `N` days. |
+| `--help` | Lists all available commands and their descriptions in a comment. |
 
 ---
 

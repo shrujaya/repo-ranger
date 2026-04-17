@@ -599,3 +599,54 @@ async def run_stale_pr_report(
         print(f"Posted stale PR report to Issue #{target_number}")
     else:
         print(msg)
+
+async def run_help(
+    repo_full_name: str,
+    github_token: str,
+    target_number: int | None = None,
+):
+    """
+    Triggered by `--help`.
+    Posts a comprehensive list of all supported RepoRanger commands.
+    """
+    headers = _make_headers(github_token)
+
+    msg = (
+        "## 🌳 RepoRanger Command Reference\n\n"
+        "Here is a list of all commands you can use in this issue (title or body) or as comments:\n\n"
+        "### 📋 Reporting Commands\n"
+        "| Keyword | What it does |\n"
+        "|---------|--------------|\n"
+        "| `dead+branches=<N>` | 🔍 One-off scan — posts a list of branches inactive for >= `N` days. |\n"
+        "| `branch+stats=<N>` | 📊 Detailed report — shows a table with author, age, and last commit date. |\n"
+        "| `unmerged+only=<N>` | ⚠️ Reports only stale branches that have **not** been merged. |\n"
+        "| `author+report=<N>` | 👥 Groups stale branches **by last committer**. |\n"
+        "| `check+merged` | 👻 Reports branches already **fully merged** but never deleted. |\n"
+        "| `stale+pr=<N>` | 🕰️ Reports open PRs with no activity for >= `N` days. |\n"
+        "| `--help` | 📖 Shows this command reference. |\n\n"
+        "### ⏰ Scheduled Scanning\n"
+        "| Keyword | What it does |\n"
+        "|---------|--------------|\n"
+        "| `check+dead=<N>` | 🔁 Sets up a **recurring scan** every `N` days on this issue. |\n\n"
+        "### ⏸️ Scheduling Controls\n"
+        "| Command | What it does |\n"
+        "|---------|--------------|\n"
+        "| `pause+janitor` | ⏸ Pauses all future scheduled reports on this issue. |\n"
+        "| `resume+janitor` | ▶ Resumes scheduled reports. |\n"
+        "| `stop+janitor` | 🛑 Permanently stops scanning and **closes** the tracking issue. |\n\n"
+        "### 🛡️ Branch Protection\n"
+        "| Keyword | What it does |\n"
+        "|---------|--------------|\n"
+        "| `protect+branch=<name>` | 🛡️ Marks a branch as protected — it will **never** be flagged. |\n\n"
+        "### 🗑️ Deletion Commands\n"
+        "| Trigger | What it does |\n"
+        "|---------|--------------|\n"
+        "| Reply with exact `branch-name` | 💥 Deletes that **single branch** immediately. |\n"
+        "| `delete+all+dead=<N>` | ☢️ Deletes **all** branches older than `N` days in one shot. |\n"
+    )
+
+    if target_number:
+        await _post_comment(repo_full_name, target_number, msg, headers)
+        print(f"Posted help reference to Issue #{target_number}")
+    else:
+        print(msg)

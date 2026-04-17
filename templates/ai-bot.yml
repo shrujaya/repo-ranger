@@ -1,4 +1,4 @@
-# RepoRanger Workflow Template - Version 1.0.1
+# RepoRanger Workflow Template - Version 1.0.2
 name: RepoRanger
 on:
   schedule:
@@ -6,7 +6,7 @@ on:
   workflow_dispatch:
     inputs:
       task:
-        description: 'Task to run (review/janitor)'
+        description: 'Task to run (review/janitor/help)'
         default: 'review'
       target_number:
         description: 'PR or Issue number to act on'

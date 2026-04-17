@@ -125,6 +125,7 @@ async def _process_report_commands(text_to_search: str, token: str, owner: str, 
     match_author      = re.search(r'author\+report=(\d+)',              text_to_search, re.IGNORECASE)
     match_check_merged= re.search(r'check\+merged',                     text_to_search, re.IGNORECASE)
     match_stale_pr    = re.search(r'stale\+pr=(\d+)',                   text_to_search, re.IGNORECASE)
+    match_help        = re.search(r'--help',                            text_to_search, re.IGNORECASE)
 
     if match_manual:
         days = match_manual.group(1)
@@ -133,6 +134,14 @@ async def _process_report_commands(text_to_search: str, token: str, owner: str, 
             inputs={"task": "janitor", "target_number": str(issue_number), "dead_branch_threshold": days},
         )
         messages.append(f"Triggered manual dead-branch check for {days} days on Issue #{issue_number}")
+        return True
+
+    elif match_help:
+        await trigger_workflow_dispatch(
+            token, owner, repo_name, "ai-bot.yml", "main",
+            inputs={"task": "help", "target_number": str(issue_number)},
+        )
+        messages.append(f"Triggered help reference on Issue #{issue_number}")
         return True
 
     elif match_cron:
