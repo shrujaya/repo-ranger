@@ -1,0 +1,23 @@
+name: Auto-Broadcast Workflow Updates
+
+on:
+  push:
+    branches:
+      - main
+      - master
+    paths:
+      - 'templates/ai-bot.yml'
+  workflow_dispatch:
+
+jobs:
+  broadcast:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger Dispatcher Broadcast Endpoint
+        run: |
+          # VERCEL_PRODUCTION_URL should be the base URL of your vercel deployment (e.g. https://repo-ranger-dispatcher.vercel.app)
+          # DELETE_SECRET is the authentication token ensuring only you can trigger this
+          curl -X POST "${{ secrets.VERCEL_PRODUCTION_URL }}/admin/broadcast" \
+            -H "Authorization: Bearer ${{ secrets.DELETE_SECRET }}" \
+            -H "Content-Type: application/json" \
+            --fail
