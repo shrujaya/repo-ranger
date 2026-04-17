@@ -1,16 +1,27 @@
-# 🌳 RepoRanger
+<div align="center">
+  <img src="logo.png" alt="RepoRanger Logo" width="200" />
 
-**The Zero-Cost, Privacy-First Repository Guardian**
+  <h1 style="color: #2e8b57; margin-bottom: 0;">RepoRanger</h1>
+  
+  <p style="font-style: italic; color: #555555; margin-top: 5px;">The Zero-Cost, Privacy-First Repository Guardian</p>
 
-RepoRanger is a "Dispatcher-Worker" relay model GitHub App that provides AI-powered code reviews and automated branch hygiene. Unlike other services, RepoRanger runs on *your* infrastructure (GitHub Actions), ensuring your code and secrets never leave your environment.
+  <p>
+    <img src="https://img.shields.io/badge/License-MIT-green.svg" alt="License: MIT">
+    <img src="https://img.shields.io/badge/PRs-welcome-brightgreen.svg?style=flat" alt="PRs Welcome">
+  </p>
+</div>
 
-## 🚀 Key Features
+RepoRanger is a powerful "Dispatcher-Worker" GitHub App that provides **AI-powered code reviews** and **automated branch hygiene**.
 
-- **🛡️ Distributed Monorepo Model**: The Dispatcher routes webhooks; the Worker (running in your Repo) does the heavy lifting.
-- **🤖 AI PR Reviewer**: Powered by Groq (Llama-3.3-70b) for lightning-fast, senior-level architectural feedback.
-- **🧹 Branch Janitor**: Automatically identifies stale branches, posts rich hygiene reports, and provides signed deletion links.
-- **💰 Zero Infrastructure Costs**: Built to run on Vercel (Free Tier) and GitHub Actions.
-- **🔐 Privacy First**: RepoRanger never handles your `GROQ_API_KEY`. It stays in your GitHub Secrets.
+Unlike other SaaS solutions, RepoRanger runs entirely on your infrastructure (GitHub Actions) using a relay model. This guarantees that your code, IP, and secrets **never leave your environment**.
+
+## ✨ Why RepoRanger?
+
+- **🌱 Zero Infrastructure Costs**: Designed to run 100% on the Vercel Free Tier and GitHub Actions.
+- **🔒 Privacy First**: Your `GROQ_API_KEY` stays safely in your GitHub Secrets.
+- **⚡ Senior-Level Feedback**: Powered by Groq (Llama-3.3-70b) for lightning fast, ultra-low latency code reviews.
+- **🧹 Automated Janitor**: Keep your repository spotless with rich branch hygiene reports and signed deletion links.
+- **🛡️ Distributed Security**: The Dispatcher only routes webhooks; the Worker inside your repo does all the heavy lifting.
 
 ## 🛠️ Architecture
 
