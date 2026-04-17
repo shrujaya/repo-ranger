@@ -607,42 +607,41 @@ async def run_help(
 ):
     """
     Triggered by `--help`.
-    Posts a comprehensive list of all supported RepoRanger commands.
+    Posts a comprehensive list of all supported RepoRanger commands matching README.md.
     """
     headers = _make_headers(github_token)
 
     msg = (
         "## 🌳 RepoRanger Command Reference\n\n"
-        "Here is a list of all commands you can use in this issue (title or body) or as comments:\n\n"
+        "All commands are activated by including a keyword in the **title or body of a GitHub Issue** or as **comments**.\n\n"
         "### 📋 Reporting Commands\n"
         "| Keyword | What it does |\n"
         "|---------|--------------|\n"
-        "| `dead+branches=<N>` | 🔍 One-off scan — posts a list of branches inactive for >= `N` days. |\n"
-        "| `branch+stats=<N>` | 📊 Detailed report — shows a table with author, age, and last commit date. |\n"
-        "| `unmerged+only=<N>` | ⚠️ Reports only stale branches that have **not** been merged. |\n"
-        "| `author+report=<N>` | 👥 Groups stale branches **by last committer**. |\n"
-        "| `check+merged` | 👻 Reports branches already **fully merged** but never deleted. |\n"
-        "| `stale+pr=<N>` | 🕰️ Reports open PRs with no activity for >= `N` days. |\n"
-        "| `--help` | 📖 Shows this command reference. |\n\n"
+        "| `dead+branches=<N>` | One-off scan — posts a list of all branches inactive for more than `N` days. Includes a detailed table with last author, exact age, and last commit date. |\n"
+        "| `unmerged+only=<N>` | Reports only stale branches that have **not** been merged into the default branch (safe to review before deleting). |\n"
+        "| `author+report=<N>` | Groups stale branches **by last committer** — great for pinging team members to clean up their own branches. |\n"
+        "| `check+merged` | Reports branches that were already **fully merged** into the default branch but were never deleted (\"ghost branches\"). |\n"
+        "| `stale+pr=<N>` | Reports open PRs with no activity for more than `N` days. |\n"
+        "| `--help` | Lists all available commands and their descriptions in a comment. |\n\n"
         "### ⏰ Scheduled Scanning\n"
         "| Keyword | What it does |\n"
-        "|---------|--------------|\n"
-        "| `check+dead=<N>` | 🔁 Sets up a **recurring scan** every `N` days on this issue. |\n\n"
+        "|---------|--------------|\\n"
+        "| `check+dead=<N>` | Sets up a **recurring scan** every `N` days. RepoRanger will post a fresh dead-branch report to this issue on each scheduled run. |\n\n"
         "### ⏸️ Scheduling Controls\n"
         "| Command | What it does |\n"
         "|---------|--------------|\n"
-        "| `pause+janitor` | ⏸ Pauses all future scheduled reports on this issue. |\n"
-        "| `resume+janitor` | ▶ Resumes scheduled reports. |\n"
-        "| `stop+janitor` | 🛑 Permanently stops scanning and **closes** the tracking issue. |\n\n"
+        "| `pause+janitor` | ⏸ Pauses all future scheduled reports. Adds a `janitor-paused` label. |\n"
+        "| `resume+janitor` | ▶ Resumes scheduled reports. Removes the `janitor-paused` label. |\n"
+        "| `stop+janitor` | 🛑 Permanently stops scanning and **closes** the tracking issue(s). |\n\n"
         "### 🛡️ Branch Protection\n"
         "| Keyword | What it does |\n"
         "|---------|--------------|\n"
-        "| `protect+branch=<name>` | 🛡️ Marks a branch as protected — it will **never** be flagged. |\n\n"
+        "| `protect+branch=<branch-name>` | Marks a branch as protected — the janitor will **never flag or delete** it. |\n\n"
         "### 🗑️ Deletion Commands\n"
         "| Trigger | What it does |\n"
         "|---------|--------------|\n"
-        "| Reply with exact `branch-name` | 💥 Deletes that **single branch** immediately. |\n"
-        "| `delete+all+dead=<N>` | ☢️ Deletes **all** branches older than `N` days in one shot. |\n"
+        "| Reply with exact `branch-name` | Deletes that **single branch** immediately. |\n"
+        "| `delete+all+dead=<N>` | ⚠️ Nukes **all** branches older than `N` days in one shot. Posts a deletion report. |\n"
     )
 
     if target_number:
