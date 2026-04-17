@@ -25,14 +25,31 @@ Unlike other SaaS solutions, RepoRanger runs entirely on your infrastructure (Gi
 
 ## 🛠️ Architecture
 
+### AI Pull Request Reviewer
 ```mermaid
 graph TD
-    A[GitHub Event] --> B(Dispatcher - FastAPI/Vercel)
-    B --> C{Event Type}
-    C -- installation.created --> D[Onboarding PR + ai-bot.yml]
-    C -- pull_request.opened --> E[Trigger GitHub Action]
-    E --> F[Worker - Groq AI]
-    F --> G[Review Comments / Hygiene Report]
+    A[GitHub PR Event] -->|Webhook| B(Dispatcher API)
+    B --> C{Event Action}
+    C -- opened / synchronize --> D[Trigger GitHub Action]
+    D --> E[Worker runs inside Repo]
+    E -->|Analyze Diff| F[Groq AI 70B]
+    F --> G[Post Review Comments to PR]
+```
+
+### Automated Branch Janitor
+```mermaid
+graph TD
+    A[GitHub Issue Event] -->|Webhook| B(Dispatcher API)
+    B --> C{Keyword Parser}
+    
+    C -- e.g. dead+branches=30 --> D[Trigger GitHub Action]
+    D --> E[Worker runs inside Repo]
+    E -->|Analyze git history| F{Stale Branches?}
+    F -- Found --> G[Post Hygiene Report to Issue]
+    F -- Clean --> H[Post All Clear Message]
+    
+    C -- Admin comments branch name --> I[Dispatcher calls GitHub API]
+    I -->|Direct API Call| J[Delete Branch]
 ```
 
 ## 📦 Setup Instructions
