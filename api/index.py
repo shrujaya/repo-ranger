@@ -6,6 +6,7 @@ from fastapi import FastAPI, Request, HTTPException, Header
 from fastapi.responses import HTMLResponse
 from typing import Optional
 import re
+import time
 
 # Vercel runs files in api/ at the repo root, so we do a package-relative import
 from .github_api import GitHubAppAuth, trigger_workflow_dispatch, create_file_and_pr
@@ -521,3 +522,89 @@ async def execute_delete(request: Request):
   </div>
 </body>
 </html>"""
+
+
+@app.post("/admin/broadcast")
+async def broadcast_workflow_update(request: Request):
+    """
+    Broadcasts the latest ai-bot.yml template to all installed repositories.
+    Protected by the DELETE_SECRET.
+    """
+    auth_header = request.headers.get("Authorization", "")
+    if not auth_header.startswith("Bearer "):
+        raise HTTPException(status_code=401, detail="Missing or invalid token")
+    
+    token = auth_header.split(" ")[1]
+    if not DELETE_SECRET or not hmac.compare_digest(token, DELETE_SECRET):
+        raise HTTPException(status_code=401, detail="Invalid admin token")
+
+    if not auth:
+        raise HTTPException(status_code=500, detail="GitHub App not configured")
+
+    new_content = _load_template()
+    messages = []
+
+    # 1. Fetch all installations
+    try:
+        installations = await auth.list_installations()
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to fetch installations: {e}")
+
+    for install in installations:
+        install_id = install["id"]
+        try:
+            install_token = await auth.get_installation_token(install_id)
+            repos = await auth.list_installation_repos(install_token)
+        except Exception as e:
+            messages.append(f"Failed to access installation {install_id}: {e}")
+            continue
+
+        for repo in repos:
+            owner = repo["owner"]["login"]
+            repo_name = repo["name"]
+            path = ".github/workflows/ai-bot.yml"
+
+            try:
+                # 2. Check if the file exists and if its content matches the template
+                current_sha = await auth.get_file_sha(install_token, owner, repo_name, path)
+                if not current_sha:
+                    # File doesn't exist. We could open an onboarding PR, but let's stick to updating existing ones.
+                    continue
+
+                current_content = await auth.get_file_content(install_token, owner, repo_name, path)
+                if current_content and current_content.strip() == new_content.strip():
+                    messages.append(f"[{owner}/{repo_name}] Already up to date.")
+                    continue
+
+                # 3. Content is different. Open a PR to update it.
+                branch_name = f"update/reporanger-workflow-{int(time.time())}"
+                
+                # Check if we already have an update PR open
+                open_prs = await auth.list_pull_requests(install_token, owner, repo_name)
+                if any("Update: RepoRanger Workflow" in pr["title"] for pr in open_prs):
+                    messages.append(f"[{owner}/{repo_name}] Update PR already open.")
+                    continue
+
+                await create_file_and_pr(
+                    token=install_token,
+                    owner=owner,
+                    repo=repo_name,
+                    branch=branch_name,
+                    path=path,
+                    content=new_content,
+                    commit_message="🤖 chore: update RepoRanger workflow template",
+                    pr_title="🤖 Update: RepoRanger Workflow",
+                    pr_body=(
+                        "👋 **RepoRanger Update Available!**\n\n"
+                        "The central RepoRanger template has been updated with new features or bug fixes. "
+                        "Merging this PR will update your `.github/workflows/ai-bot.yml` file to the latest version.\n\n"
+                        "> This is an automated PR triggered by the RepoRanger administrator."
+                    ),
+                    file_sha=current_sha,
+                )
+                messages.append(f"[{owner}/{repo_name}] Successfully opened update PR.")
+
+            except Exception as e:
+                messages.append(f"[{owner}/{repo_name}] Failed to update: {e}")
+
+    return {"status": "broadcast complete", "details": messages}

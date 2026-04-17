@@ -20,6 +20,20 @@ class GitHubAppAuth:
         }
         return jwt.encode(payload, self.private_key, algorithm="RS256")
 
+    async def list_installations(self) -> list:
+        """List all installations of this GitHub App."""
+        jwt_token = self.generate_jwt()
+        url = "https://api.github.com/app/installations"
+        headers = {
+            "Authorization": f"Bearer {jwt_token}",
+            "Accept": "application/vnd.github+json",
+            "X-GitHub-Api-Version": "2022-11-28",
+        }
+        async with httpx.AsyncClient() as client:
+            response = await client.get(url, headers=headers)
+            response.raise_for_status()
+            return response.json()
+
     async def get_installation_token(self, installation_id: int) -> str:
         """Exchange JWT for an installation access token."""
         jwt_token = self.generate_jwt()
@@ -49,6 +63,37 @@ class GitHubAppAuth:
             if response.status_code == 200:
                 return response.json()["sha"]
             return None
+
+    async def get_file_content(
+        self, token: str, owner: str, repo: str, path: str
+    ) -> Optional[str]:
+        """Check if a file exists and return its decoded content (None if missing)."""
+        url = f"https://api.github.com/repos/{owner}/{repo}/contents/{path}"
+        headers = {
+            "Authorization": f"Bearer {token}",
+            "Accept": "application/vnd.github+json",
+            "X-GitHub-Api-Version": "2022-11-28",
+        }
+        async with httpx.AsyncClient() as client:
+            response = await client.get(url, headers=headers)
+            if response.status_code == 200:
+                data = response.json()
+                if "content" in data:
+                    return base64.b64decode(data["content"]).decode()
+            return None
+
+    async def list_installation_repos(self, token: str) -> list:
+        """List repositories accessible by the given installation token."""
+        url = "https://api.github.com/installation/repositories"
+        headers = {
+            "Authorization": f"Bearer {token}",
+            "Accept": "application/vnd.github+json",
+            "X-GitHub-Api-Version": "2022-11-28",
+        }
+        async with httpx.AsyncClient() as client:
+            response = await client.get(url, headers=headers)
+            response.raise_for_status()
+            return response.json().get("repositories", [])
 
     async def list_pull_requests(
         self, token: str, owner: str, repo: str, state: str = "open"
@@ -247,6 +292,7 @@ async def create_file_and_pr(
     pr_title: str,
     pr_body: str,
     base_branch: str = "main",
+    file_sha: Optional[str] = None,
 ) -> dict:
     """Create a branch, commit a file, and open a PR."""
     gh_headers = {
@@ -279,14 +325,18 @@ async def create_file_and_pr(
             raise Exception(f"Branch creation failed: {branch_resp.text}")
 
         # 3. Commit the file (base64-encoded)
+        payload = {
+            "message": commit_message,
+            "content": base64.b64encode(content.encode()).decode(),
+            "branch": branch,
+        }
+        if file_sha:
+            payload["sha"] = file_sha
+
         commit_resp = await client.put(
             f"https://api.github.com/repos/{owner}/{repo}/contents/{path}",
             headers=gh_headers,
-            json={
-                "message": commit_message,
-                "content": base64.b64encode(content.encode()).decode(),
-                "branch": branch,
-            },
+            json=payload,
         )
         if commit_resp.status_code >= 400:
             raise Exception(f"File commit failed: {commit_resp.text}")
