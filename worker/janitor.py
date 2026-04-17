@@ -517,3 +517,85 @@ async def run_check_merged(
         print(f"Posted merged-branch report to Issue #{target_number}")
     else:
         print(msg)
+
+
+async def run_stale_pr_report(
+    repo_full_name: str,
+    github_token: str,
+    threshold_days: int,
+    target_number: int | None = None,
+):
+    """
+    Triggered by `stale+pr=<N>`.
+    Reports open PRs with no activity (commits, comments, or reviews)
+    for >= N days, sorted by most inactive first.
+    """
+    headers = _make_headers(github_token)
+    now = datetime.utcnow()
+    stale_prs = []
+    page = 1
+
+    # Fetch all open PRs with pagination
+    async with httpx.AsyncClient() as client:
+        while True:
+            resp = await client.get(
+                f"https://api.github.com/repos/{repo_full_name}/pulls",
+                headers=headers,
+                params={"state": "open", "per_page": 100, "page": page},
+            )
+            if resp.status_code != 200:
+                print(f"Failed to fetch PRs: {resp.status_code}")
+                break
+            prs = resp.json()
+            if not prs:
+                break
+            for pr in prs:
+                updated_at_str = pr.get("updated_at", "")
+                if not updated_at_str:
+                    continue
+                updated_at = datetime.strptime(updated_at_str, "%Y-%m-%dT%H:%M:%SZ")
+                days_inactive = (now - updated_at).days
+                if days_inactive >= threshold_days:
+                    stale_prs.append({
+                        "number": pr["number"],
+                        "title": pr["title"],
+                        "author": pr["user"]["login"],
+                        "days_inactive": days_inactive,
+                        "updated_at": updated_at_str[:10],
+                        "url": pr["html_url"],
+                    })
+            if len(prs) < 100:
+                break
+            page += 1
+
+    if not stale_prs:
+        msg = (
+            f"✅ **No stale PRs found!** All open PRs have had activity within the last "
+            f"{threshold_days} days. Great job keeping things moving! 🎉"
+        )
+    else:
+        stale_prs.sort(key=lambda p: p["days_inactive"], reverse=True)
+        msg = (
+            f"## 🕰️ RepoRanger Stale PR Report\n\n"
+            f"The following open PRs haven't had any activity in over {threshold_days} days:\n\n"
+            f"| PR | Title | Author | Days Inactive | Last Updated |\n"
+            f"|----|-------|--------|---------------|--------------|\n"
+        )
+        for p in stale_prs:
+            msg += (
+                f"| [#{p['number']}]({p['url']}) "
+                f"| {p['title']} "
+                f"| @{p['author']} "
+                f"| {p['days_inactive']} days "
+                f"| {p['updated_at']} |\n"
+            )
+        msg += (
+            f"\n> Total stale PRs: **{len(stale_prs)}**\n"
+            "> **Admins:** Ping the authors or close PRs that are no longer relevant."
+        )
+
+    if target_number:
+        await _post_comment(repo_full_name, target_number, msg, headers)
+        print(f"Posted stale PR report to Issue #{target_number}")
+    else:
+        print(msg)

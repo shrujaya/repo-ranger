@@ -1,4 +1,4 @@
-# RepoRanger Workflow Template (Version 1.0.0)
+# RepoRanger Workflow Template - Version 1.0.0
 name: RepoRanger
 on:
   schedule:

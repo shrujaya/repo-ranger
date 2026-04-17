@@ -10,6 +10,7 @@ from .janitor import (
     run_unmerged_report,
     run_author_report,
     run_check_merged,
+    run_stale_pr_report,
 )
 
 
@@ -67,6 +68,9 @@ async def main():
 
     elif task == "check_merged":
         await run_check_merged(repo, github_token, target_number)
+
+    elif task == "stale_pr_report":
+        await run_stale_pr_report(repo, github_token, threshold, target_number)
 
     else:
         print(f"Unknown task: {task}")
