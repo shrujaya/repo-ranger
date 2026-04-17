@@ -124,6 +124,7 @@ async def _process_report_commands(text_to_search: str, token: str, owner: str, 
     match_unmerged    = re.search(r'unmerged\+only=(\d+)',               text_to_search, re.IGNORECASE)
     match_author      = re.search(r'author\+report=(\d+)',              text_to_search, re.IGNORECASE)
     match_check_merged= re.search(r'check\+merged',                     text_to_search, re.IGNORECASE)
+    match_stale_pr    = re.search(r'stale\+pr=(\d+)',                   text_to_search, re.IGNORECASE)
 
     if match_manual:
         days = match_manual.group(1)
@@ -187,6 +188,15 @@ async def _process_report_commands(text_to_search: str, token: str, owner: str, 
         messages.append(f"Triggered merged-but-not-deleted check on Issue #{issue_number}")
         return True
 
+    elif match_stale_pr:
+        days = match_stale_pr.group(1)
+        await trigger_workflow_dispatch(
+            token, owner, repo_name, "ai-bot.yml", "main",
+            inputs={"task": "stale_pr_report", "target_number": str(issue_number), "dead_branch_threshold": days},
+        )
+        messages.append(f"Triggered stale PR report (>={days} days) on Issue #{issue_number}")
+        return True
+
     return False
 
 
@@ -235,17 +245,20 @@ async def webhook_handler(
 
         # --- PR opened/reopened/sync → trigger the worker ---
         elif "pull_request" in event and action in ["opened", "reopened", "synchronize"]:
-            installation_id = event["installation"]["id"]
-            owner = event["repository"]["owner"]["login"]
-            repo_name = event["repository"]["name"]
-            pr_number = event["pull_request"]["number"]
-            token = await auth.get_installation_token(installation_id)
-            
-            await trigger_workflow_dispatch(
-                token, owner, repo_name, "ai-bot.yml", "main",
-                inputs={"task": "review", "target_number": str(pr_number)},
-            )
-            messages.append(f"Triggered AI review worker for PR #{pr_number}")
+            if event["pull_request"]["user"]["type"] == "Bot":
+                messages.append("Skipping bot-originated pull request.")
+            else:
+                installation_id = event["installation"]["id"]
+                owner = event["repository"]["owner"]["login"]
+                repo_name = event["repository"]["name"]
+                pr_number = event["pull_request"]["number"]
+                token = await auth.get_installation_token(installation_id)
+                
+                await trigger_workflow_dispatch(
+                    token, owner, repo_name, "ai-bot.yml", "main",
+                    inputs={"task": "review", "target_number": str(pr_number)},
+                )
+                messages.append(f"Triggered AI review worker for PR #{pr_number}")
 
         # --- Issue opened → keyword parser ---
         elif "issue" in event and action == "opened" and "pull_request" not in event.get("issue", {}):
