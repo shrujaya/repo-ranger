@@ -235,17 +235,20 @@ async def webhook_handler(
 
         # --- PR opened/reopened/sync → trigger the worker ---
         elif "pull_request" in event and action in ["opened", "reopened", "synchronize"]:
-            installation_id = event["installation"]["id"]
-            owner = event["repository"]["owner"]["login"]
-            repo_name = event["repository"]["name"]
-            pr_number = event["pull_request"]["number"]
-            token = await auth.get_installation_token(installation_id)
-            
-            await trigger_workflow_dispatch(
-                token, owner, repo_name, "ai-bot.yml", "main",
-                inputs={"task": "review", "target_number": str(pr_number)},
-            )
-            messages.append(f"Triggered AI review worker for PR #{pr_number}")
+            if event["pull_request"]["user"]["type"] == "Bot":
+                messages.append("Skipping bot-originated pull request.")
+            else:
+                installation_id = event["installation"]["id"]
+                owner = event["repository"]["owner"]["login"]
+                repo_name = event["repository"]["name"]
+                pr_number = event["pull_request"]["number"]
+                token = await auth.get_installation_token(installation_id)
+                
+                await trigger_workflow_dispatch(
+                    token, owner, repo_name, "ai-bot.yml", "main",
+                    inputs={"task": "review", "target_number": str(pr_number)},
+                )
+                messages.append(f"Triggered AI review worker for PR #{pr_number}")
 
         # --- Issue opened → keyword parser ---
         elif "issue" in event and action == "opened" and "pull_request" not in event.get("issue", {}):
